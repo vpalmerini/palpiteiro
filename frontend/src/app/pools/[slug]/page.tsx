@@ -49,20 +49,20 @@ export default function PoolPage({ params }: PageProps) {
     });
     window.localStorage.setItem(`bolao:${slug}:participantId`, result.participantId);
     setParticipantId(result.participantId);
-    setMessage("Entrada confirmada. Agora voce ja pode registrar seus palpites.");
+    setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
     setRanking(await getRanking(slug));
   }
 
   if (!pool) {
-    return <p>Carregando bolao...</p>;
+    return <p>Carregando bolão...</p>;
   }
 
   return (
     <div className="stack">
       <section className="card stack">
-        <span className="pill">Link publico</span>
+        <span className="pill">Link público</span>
         <h1 style={{ fontSize: "3rem" }}>{pool.name}</h1>
-        <p>{pool.description || "Sem descricao."}</p>
+        <p>{pool.description || "Sem descrição."}</p>
         <input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <Link className="button" href={`/pools/${slug}/predictions`}>
@@ -73,8 +73,8 @@ export default function PoolPage({ params }: PageProps) {
 
       <div className="grid">
         <section className="card stack">
-          <h2>Entrar no bolao</h2>
-          {participantId ? <p className="notice">Voce ja esta participando neste navegador.</p> : null}
+          <h2>Entrar no bolão</h2>
+          {participantId ? <p className="notice">Você já está participando neste navegador.</p> : null}
           <form className="stack" onSubmit={onJoin}>
             <label>
               Nome exibido
@@ -82,7 +82,7 @@ export default function PoolPage({ params }: PageProps) {
             </label>
             <label>
               E-mail opcional
-              <input name="email" type="email" placeholder="voce@email.com" />
+              <input name="email" type="email" placeholder="seu-email@exemplo.com" />
             </label>
             {message ? <p className="notice">{message}</p> : null}
             <button className="button" type="submit">
@@ -92,10 +92,10 @@ export default function PoolPage({ params }: PageProps) {
         </section>
 
         <section className="card stack">
-          <h2>Premios</h2>
+          <h2>Prêmios</h2>
           {pool.prizes.map((prize) => (
             <p key={prize.position}>
-              <strong>{prize.position}o lugar:</strong> {prize.description}
+              <strong>{prize.position}º lugar:</strong> {prize.description}
             </p>
           ))}
         </section>
@@ -106,7 +106,7 @@ export default function PoolPage({ params }: PageProps) {
         <table className="table">
           <thead>
             <tr>
-              <th>Posicao</th>
+              <th>Posição</th>
               <th>Participante</th>
               <th>Pontos</th>
               <th>Placares exatos</th>
@@ -127,7 +127,7 @@ export default function PoolPage({ params }: PageProps) {
       </section>
 
       <section className="card stack">
-        <h2>Proximos jogos</h2>
+        <h2>Próximos jogos</h2>
         {matches.map((match) => (
           <div className="card" key={match.id} style={{ boxShadow: "none" }}>
             <strong>

@@ -4,8 +4,8 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bolao da Copa",
-  description: "MVP para criar e participar de boloes de futebol.",
+  title: "Bolão da Copa",
+  description: "MVP para criar e participar de bolões de futebol.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -15,10 +15,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <main>
           <nav style={{ display: "flex", justifyContent: "space-between", marginBottom: 32 }}>
             <Link href="/" style={{ fontWeight: 800 }}>
-              Bolao da Copa
+              Bolão da Copa
             </Link>
             <Link className="button secondary" href="/pools/new">
-              Criar bolao
+              Criar bolão
             </Link>
           </nav>
           {children}

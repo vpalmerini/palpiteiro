@@ -63,7 +63,7 @@ export default function PredictionsPage({ params }: PageProps) {
   async function onSubmit(event: FormEvent<HTMLFormElement>, match: Match) {
     event.preventDefault();
     if (!participantId) {
-      setMessage("Entre no bolao antes de palpitar.");
+      setMessage("Entre no bolão antes de palpitar.");
       return;
     }
 
@@ -91,12 +91,12 @@ export default function PredictionsPage({ params }: PageProps) {
         <span className="pill">Palpites</span>
         <h1 style={{ fontSize: "3rem" }}>{pool.name}</h1>
         <p>
-          Registre placares antes do inicio de cada jogo. Em mata-mata, palpite empatado significa decisao nos penaltis.
+          Registre placares antes do início de cada jogo. Em mata-mata, palpite empatado significa decisão nos pênaltis.
         </p>
         <Link className="button secondary" href={`/pools/${slug}`}>
           Voltar ao ranking
         </Link>
-        {!participantId ? <p className="notice">Entre no bolao antes de registrar palpites.</p> : null}
+        {!participantId ? <p className="notice">Entre no bolão antes de registrar palpites.</p> : null}
         {message ? <p className="notice">{message}</p> : null}
       </section>
 
@@ -152,11 +152,11 @@ export default function PredictionsPage({ params }: PageProps) {
               {match.stage.isKnockout ? (
                 <div className="stack">
                   <p>
-                    Se o palpite for empate, o jogo sera considerado decidido nos penaltis. Nesse caso, escolha o
+                    Se o palpite for empate, o jogo será considerado decidido nos pênaltis. Nesse caso, escolha o
                     vencedor abaixo.
                   </p>
                   <label>
-                    Vencedor nos penaltis
+                    Vencedor nos pênaltis
                     <select
                       defaultValue={prediction?.penaltyWinnerTeamId ?? ""}
                       disabled={match.isLocked || !isPredictedKnockoutDraw}
