@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bolao_postgres
+    environment:
+      POSTGRES_DB: bolao
+      POSTGRES_USER: bolao
+      POSTGRES_PASSWORD: bolao
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bolao -d bolao"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: bolao_backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://bolao:bolao@postgres:5432/bolao
+      FLASK_DEBUG: "true"
+      FRONTEND_ORIGIN: http://localhost:3000
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "flask --app run init-db &&
+             flask --app run seed-db &&
+             flask --app run run --host=0.0.0.0 --port=5001"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: bolao_frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:5001/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: npm run dev -- --hostname 0.0.0.0
+
+volumes:
+  postgres_data:
