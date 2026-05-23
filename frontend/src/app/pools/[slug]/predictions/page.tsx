@@ -16,11 +16,19 @@ import {
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import { getMatches, getPool, getPredictions, savePrediction } from "@/lib/api";
-import type { Match, Pool, Prediction } from "@/types";
+import { getAwardPrediction, getMatches, getPool, getPredictions, listTeams, saveAwardPrediction, savePrediction } from "@/lib/api";
+import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
 
 type PageProps = {
   params: { slug: string } | Promise<{ slug: string }>;
+};
+
+type AwardDraft = {
+  championTeamId: string;
+  runnerUpTeamId: string;
+  thirdPlaceTeamId: string;
+  topScorer: string;
+  bestPlayer: string;
 };
 
 export default function PredictionsPage({ params }: PageProps) {
@@ -28,8 +36,14 @@ export default function PredictionsPage({ params }: PageProps) {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [pool, setPool] = useState<Pool | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [predictions, setPredictions] = useState<Record<number, Prediction>>({});
   const [scoreDrafts, setScoreDrafts] = useState<Record<number, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
+  const [savedAwardPrediction, setSavedAwardPrediction] = useState<AwardPrediction | null>(null);
+  const [awardDraft, setAwardDraft] = useState<AwardDraft>({ championTeamId: "", runnerUpTeamId: "", thirdPlaceTeamId: "", topScorer: "", bestPlayer: "" });
+  const [awardLocked, setAwardLocked] = useState(false);
+  const [tournamentStatus, setTournamentStatus] = useState<string>("not_started");
+  const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,11 +56,14 @@ export default function PredictionsPage({ params }: PageProps) {
     void Promise.all([
       getPool(slug),
       getMatches(slug),
+      listTeams(),
       storedParticipantId ? getPredictions(slug, storedParticipantId) : Promise.resolve([]),
-    ]).then(([poolData, matchData, predictionData]) => {
+      storedParticipantId ? getAwardPrediction(slug, storedParticipantId) : Promise.resolve(null),
+    ]).then(([poolData, matchData, teamData, predictionData, awardData]) => {
       setParticipantId(storedParticipantId);
       setPool(poolData);
       setMatches(matchData);
+      setTeams(teamData);
       setPredictions(Object.fromEntries(predictionData.map((prediction) => [prediction.matchId, prediction])));
       setScoreDrafts(
         Object.fromEntries(
@@ -60,6 +77,21 @@ export default function PredictionsPage({ params }: PageProps) {
           ]),
         ),
       );
+      if (awardData) {
+        setAwardLocked(awardData.isLocked);
+        setTournamentStatus((awardData as { isLocked: boolean; tournamentStatus?: string; prediction: AwardPrediction | null }).tournamentStatus ?? "not_started");
+        if (awardData.prediction) {
+          const p = awardData.prediction;
+          setSavedAwardPrediction(p);
+          setAwardDraft({
+            championTeamId: p.championTeamId ? String(p.championTeamId) : "",
+            runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
+            thirdPlaceTeamId: p.thirdPlaceTeamId ? String(p.thirdPlaceTeamId) : "",
+            topScorer: p.topScorer ?? "",
+            bestPlayer: p.bestPlayer ?? "",
+          });
+        }
+      }
     });
   }, [slug]);
 
@@ -73,6 +105,25 @@ export default function PredictionsPage({ params }: PageProps) {
         [field]: value,
       },
     }));
+  }
+
+  async function onAwardSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!participantId) return;
+    try {
+      const saved = await saveAwardPrediction(slug, {
+        participantId,
+        championTeamId: awardDraft.championTeamId ? Number(awardDraft.championTeamId) : null,
+        runnerUpTeamId: awardDraft.runnerUpTeamId ? Number(awardDraft.runnerUpTeamId) : null,
+        thirdPlaceTeamId: awardDraft.thirdPlaceTeamId ? Number(awardDraft.thirdPlaceTeamId) : null,
+        topScorer: awardDraft.topScorer,
+        bestPlayer: awardDraft.bestPlayer,
+      });
+      setSavedAwardPrediction(saved);
+      setAwardMessage("Palpites especiais salvos.");
+    } catch (err) {
+      setAwardMessage(err instanceof Error ? err.message : "Erro ao salvar.");
+    }
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>, match: Match) {
@@ -252,6 +303,118 @@ export default function PredictionsPage({ params }: PageProps) {
           </Card.Root>
         );
       })}
+
+      {pool && (pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) ? (
+        <Card.Root
+          as="section"
+          rounded="2xl"
+          borderWidth={savedAwardPrediction ? "2px" : "1px"}
+          borderColor={savedAwardPrediction ? "green.300" : undefined}
+        >
+          <Card.Body gap={4}>
+            <Stack gap={1}>
+              <Stack direction="row" align="center" gap={2} flexWrap="wrap">
+                <Badge colorPalette="yellow" rounded="full">Palpites especiais</Badge>
+                {savedAwardPrediction ? (
+                  <Badge colorPalette="green" rounded="full" variant="subtle">✓ Salvo</Badge>
+                ) : (
+                  <Badge colorPalette="orange" rounded="full" variant="subtle">Sem palpite</Badge>
+                )}
+              </Stack>
+              <Text color="gray.600" fontSize="sm">
+                {awardLocked
+                  ? tournamentStatus === "finished" ? "O torneio foi encerrado." : "O torneio já começou — palpites especiais bloqueados."
+                  : "Disponíveis até o início do torneio. Cada acerto vale pontos extras no ranking."}
+              </Text>
+            </Stack>
+
+            <Separator />
+
+            <form onSubmit={onAwardSubmit}>
+              <Stack gap={4}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                  {pool.awards.champion.enabled && (
+                    <Field.Root>
+                      <Field.Label>Campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.champion.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.championTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, championTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.runnerUp.enabled && (
+                    <Field.Root>
+                      <Field.Label>Vice-campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.runnerUp.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.runnerUpTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, runnerUpTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.thirdPlace.enabled && (
+                    <Field.Root>
+                      <Field.Label>Terceiro lugar <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.thirdPlace.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.thirdPlaceTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, thirdPlaceTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.topScorer.enabled && (
+                    <Field.Root>
+                      <Field.Label>Artilheiro <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.topScorer.points} pts</Badge></Field.Label>
+                      <Input
+                        placeholder="Nome do jogador"
+                        disabled={awardLocked || !participantId}
+                        value={awardDraft.topScorer}
+                        onChange={(e) => setAwardDraft((d) => ({ ...d, topScorer: e.target.value }))}
+                      />
+                    </Field.Root>
+                  )}
+                  {pool.awards.bestPlayer.enabled && (
+                    <Field.Root>
+                      <Field.Label>Melhor jogador <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.bestPlayer.points} pts</Badge></Field.Label>
+                      <Input
+                        placeholder="Nome do jogador"
+                        disabled={awardLocked || !participantId}
+                        value={awardDraft.bestPlayer}
+                        onChange={(e) => setAwardDraft((d) => ({ ...d, bestPlayer: e.target.value }))}
+                      />
+                    </Field.Root>
+                  )}
+                </SimpleGrid>
+
+                {awardMessage && (
+                  <Text color={awardMessage.includes("Erro") ? "red.600" : "green.600"} fontSize="sm">
+                    {awardMessage}
+                  </Text>
+                )}
+
+                <Button
+                  type="submit"
+                  colorPalette="blue"
+                  rounded="full"
+                  disabled={awardLocked || !participantId}
+                  alignSelf="flex-start"
+                >
+                  {awardLocked
+                    ? tournamentStatus === "finished" ? "Torneio encerrado" : "Torneio iniciado — palpites bloqueados"
+                    : savedAwardPrediction ? "Atualizar palpites especiais" : "Salvar palpites especiais"}
+                </Button>
+              </Stack>
+            </form>
+          </Card.Body>
+        </Card.Root>
+      ) : null}
     </Stack>
   );
 }

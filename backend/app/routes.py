@@ -8,6 +8,7 @@ from sqlalchemy import func
 
 from .extensions import db
 from .models import (
+    AwardPrediction,
     Match,
     MatchStatus,
     Participant,
@@ -19,6 +20,7 @@ from .models import (
     Stage,
     Team,
     Tournament,
+    TournamentStatus,
 )
 from .scoring import calculate_prediction_score
 
@@ -94,6 +96,13 @@ def _pool_payload(pool: Pool):
             {"position": prize.position, "description": prize.description}
             for prize in prizes
         ],
+        "awards": {
+            "champion": {"enabled": pool.predict_champion, "points": pool.champion_points},
+            "runnerUp": {"enabled": pool.predict_runner_up, "points": pool.runner_up_points},
+            "thirdPlace": {"enabled": pool.predict_third_place, "points": pool.third_place_points},
+            "topScorer": {"enabled": pool.predict_top_scorer, "points": pool.top_scorer_points},
+            "bestPlayer": {"enabled": pool.predict_best_player, "points": pool.best_player_points},
+        },
     }
 
 
@@ -233,10 +242,22 @@ def create_pool():
         slug = token_urlsafe(8)
 
     scoring = data.get("scoring") or {}
+    awards_cfg = data.get("awards") or {}
     creator_name = data["creatorName"].strip()
     creator_email = data["creatorEmail"].strip()
     creator_nickname = (data.get("creatorNickname") or "").strip()
     creator_display_name = creator_nickname or creator_name
+
+    def _award_cfg(key: str, default_enabled: bool, default_pts: int):
+        cfg = awards_cfg.get(key) or {}
+        return bool(cfg.get("enabled", default_enabled)), int(cfg.get("points", default_pts))
+
+    champion_enabled, champion_pts = _award_cfg("champion", True, 15)
+    runner_up_enabled, runner_up_pts = _award_cfg("runnerUp", True, 10)
+    third_place_enabled, third_place_pts = _award_cfg("thirdPlace", True, 7)
+    top_scorer_enabled, top_scorer_pts = _award_cfg("topScorer", False, 10)
+    best_player_enabled, best_player_pts = _award_cfg("bestPlayer", False, 10)
+
     pool = Pool(
         slug=slug,
         name=data["name"].strip(),
@@ -247,6 +268,16 @@ def create_pool():
         outcome_points=int(scoring.get("outcome", 3)),
         one_team_goals_points=int(scoring.get("oneTeamGoals", 1)),
         penalty_bonus_points=int(scoring.get("penaltyBonus", 2)),
+        predict_champion=champion_enabled,
+        champion_points=champion_pts,
+        predict_runner_up=runner_up_enabled,
+        runner_up_points=runner_up_pts,
+        predict_third_place=third_place_enabled,
+        third_place_points=third_place_pts,
+        predict_top_scorer=top_scorer_enabled,
+        top_scorer_points=top_scorer_pts,
+        predict_best_player=best_player_enabled,
+        best_player_points=best_player_pts,
     )
     db.session.add(pool)
     db.session.flush()
@@ -403,7 +434,8 @@ def get_ranking(slug):
         db.session.query(
             PoolParticipant.display_name,
             Participant.public_id,
-            func.coalesce(func.sum(ScoreEntry.points), 0).label("points"),
+            Participant.id.label("participant_db_id"),
+            func.coalesce(func.sum(ScoreEntry.points), 0).label("match_points"),
             func.coalesce(func.sum(func.cast(ScoreEntry.exact_score, db.Integer)), 0).label("exact_scores"),
             func.coalesce(func.sum(func.cast(ScoreEntry.outcome_hit, db.Integer)), 0).label("outcome_hits"),
         )
@@ -411,27 +443,28 @@ def get_ranking(slug):
         .outerjoin(Prediction, (Prediction.pool_id == pool.id) & (Prediction.participant_id == Participant.id))
         .outerjoin(ScoreEntry, ScoreEntry.prediction_id == Prediction.id)
         .filter(PoolParticipant.pool_id == pool.id)
-        .group_by(PoolParticipant.display_name, Participant.public_id, PoolParticipant.joined_at)
-        .order_by(
-            db.desc("points"),
-            db.desc("exact_scores"),
-            db.desc("outcome_hits"),
-            PoolParticipant.joined_at,
-        )
+        .group_by(PoolParticipant.display_name, Participant.public_id, Participant.id, PoolParticipant.joined_at)
         .all()
     )
 
+    entries = []
+    for row in rows:
+        award_pts = _calculate_award_points(pool, row.participant_db_id)
+        entries.append({
+            "displayName": row.display_name,
+            "participantId": row.public_id,
+            "points": int(row.match_points) + award_pts,
+            "exactScores": int(row.exact_scores),
+            "outcomeHits": int(row.outcome_hits),
+            "awardPoints": award_pts,
+        })
+
+    entries.sort(key=lambda e: (-e["points"], -e["exactScores"], -e["outcomeHits"]))
+
     return jsonify(
         [
-            {
-                "position": index + 1,
-                "displayName": row.display_name,
-                "participantId": row.public_id,
-                "points": int(row.points),
-                "exactScores": int(row.exact_scores),
-                "outcomeHits": int(row.outcome_hits),
-            }
-            for index, row in enumerate(rows)
+            {"position": index + 1, **entry}
+            for index, entry in enumerate(entries)
         ]
     )
 
@@ -474,10 +507,57 @@ def _tournament_payload(tournament: Tournament):
         "id": tournament.id,
         "name": tournament.name,
         "year": tournament.year,
+        "status": tournament.status,
         "stagesCount": len(tournament.stages),
         "matchesCount": len(tournament.matches),
         "poolsCount": len(tournament.pools),
+        "awards": {
+            "championTeamId": tournament.champion_team_id,
+            "championTeam": _team_payload(tournament.champion) if tournament.champion_team_id else None,
+            "runnerUpTeamId": tournament.runner_up_team_id,
+            "runnerUpTeam": _team_payload(tournament.runner_up) if tournament.runner_up_team_id else None,
+            "thirdPlaceTeamId": tournament.third_place_team_id,
+            "thirdPlaceTeam": _team_payload(tournament.third_place) if tournament.third_place_team_id else None,
+            "topScorer": tournament.top_scorer,
+            "bestPlayer": tournament.best_player,
+        },
     }
+
+
+def _award_prediction_payload(award_pred: AwardPrediction):
+    return {
+        "id": award_pred.id,
+        "championTeamId": award_pred.champion_team_id,
+        "runnerUpTeamId": award_pred.runner_up_team_id,
+        "thirdPlaceTeamId": award_pred.third_place_team_id,
+        "topScorer": award_pred.top_scorer,
+        "bestPlayer": award_pred.best_player,
+        "updatedAt": award_pred.updated_at.isoformat(),
+    }
+
+
+def _calculate_award_points(pool: Pool, participant_db_id: int) -> int:
+    tournament = pool.tournament
+    award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant_db_id).first()
+    if award_pred is None:
+        return 0
+    points = 0
+    if pool.predict_champion and tournament.champion_team_id:
+        if award_pred.champion_team_id == tournament.champion_team_id:
+            points += pool.champion_points
+    if pool.predict_runner_up and tournament.runner_up_team_id:
+        if award_pred.runner_up_team_id == tournament.runner_up_team_id:
+            points += pool.runner_up_points
+    if pool.predict_third_place and tournament.third_place_team_id:
+        if award_pred.third_place_team_id == tournament.third_place_team_id:
+            points += pool.third_place_points
+    if pool.predict_top_scorer and tournament.top_scorer and award_pred.top_scorer:
+        if award_pred.top_scorer.strip().lower() == tournament.top_scorer.strip().lower():
+            points += pool.top_scorer_points
+    if pool.predict_best_player and tournament.best_player and award_pred.best_player:
+        if award_pred.best_player.strip().lower() == tournament.best_player.strip().lower():
+            points += pool.best_player_points
+    return points
 
 
 def _stage_payload(stage: Stage):
@@ -510,6 +590,19 @@ def create_tournament():
     db.session.add(tournament)
     db.session.commit()
     return jsonify(_tournament_payload(tournament)), 201
+
+
+@api.patch("/admin/tournaments/<int:tournament_id>/status")
+def update_tournament_status(tournament_id):
+    tournament = Tournament.query.get_or_404(tournament_id)
+    data = _json()
+    new_status = data.get("status")
+    valid = [s.value for s in TournamentStatus]
+    if new_status not in valid:
+        abort(400, description=f"status must be one of: {', '.join(valid)}")
+    tournament.status = new_status
+    db.session.commit()
+    return jsonify(_tournament_payload(tournament))
 
 
 @api.get("/admin/tournaments/<int:tournament_id>/stages")
@@ -651,6 +744,74 @@ def update_match(match_id):
 # ---------------------------------------------------------------------------
 # Admin — pools per tournament
 # ---------------------------------------------------------------------------
+
+@api.get("/teams")
+def list_teams_public():
+    teams = Team.query.order_by(Team.name).all()
+    return jsonify([_team_full_payload(t) for t in teams])
+
+
+@api.get("/pools/<slug>/award-prediction")
+def get_award_prediction(slug):
+    pool = _pool_or_404(slug)
+    participant_id = request.args.get("participantId")
+    if not participant_id:
+        abort(400, description="participantId is required")
+    participant = _participant_or_404(participant_id)
+    award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
+    is_locked = pool.tournament.status != TournamentStatus.NOT_STARTED.value
+    return jsonify({
+        "isLocked": is_locked,
+        "tournamentStatus": pool.tournament.status,
+        "prediction": _award_prediction_payload(award_pred) if award_pred else None,
+    })
+
+
+@api.post("/pools/<slug>/award-prediction")
+def upsert_award_prediction(slug):
+    pool = _pool_or_404(slug)
+    data = _json()
+    participant = _participant_or_404(data.get("participantId", ""))
+    membership = PoolParticipant.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
+    if membership is None:
+        abort(403, description="participant has not joined this pool")
+    if pool.tournament.status != TournamentStatus.NOT_STARTED.value:
+        abort(409, description="award predictions are locked")
+    award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
+    if award_pred is None:
+        award_pred = AwardPrediction(pool_id=pool.id, participant_id=participant.id)
+        db.session.add(award_pred)
+    if pool.predict_champion:
+        award_pred.champion_team_id = _parse_optional_int(data.get("championTeamId"))
+    if pool.predict_runner_up:
+        award_pred.runner_up_team_id = _parse_optional_int(data.get("runnerUpTeamId"))
+    if pool.predict_third_place:
+        award_pred.third_place_team_id = _parse_optional_int(data.get("thirdPlaceTeamId"))
+    if pool.predict_top_scorer:
+        award_pred.top_scorer = (data.get("topScorer") or "").strip() or None
+    if pool.predict_best_player:
+        award_pred.best_player = (data.get("bestPlayer") or "").strip() or None
+    db.session.commit()
+    return jsonify(_award_prediction_payload(award_pred))
+
+
+@api.patch("/admin/tournaments/<int:tournament_id>/awards")
+def update_tournament_awards(tournament_id):
+    tournament = Tournament.query.get_or_404(tournament_id)
+    data = _json()
+    if "championTeamId" in data:
+        tournament.champion_team_id = _parse_optional_int(data["championTeamId"])
+    if "runnerUpTeamId" in data:
+        tournament.runner_up_team_id = _parse_optional_int(data["runnerUpTeamId"])
+    if "thirdPlaceTeamId" in data:
+        tournament.third_place_team_id = _parse_optional_int(data["thirdPlaceTeamId"])
+    if "topScorer" in data:
+        tournament.top_scorer = (data["topScorer"] or "").strip() or None
+    if "bestPlayer" in data:
+        tournament.best_player = (data["bestPlayer"] or "").strip() or None
+    db.session.commit()
+    return jsonify(_tournament_payload(tournament))
+
 
 @api.get("/admin/tournaments/<int:tournament_id>/pools")
 def list_tournament_pools(tournament_id):

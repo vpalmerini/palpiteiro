@@ -31,8 +31,10 @@ import {
   adminListTournaments,
   adminUpdateMatch,
   adminUpdateStage,
+  adminUpdateTournamentAwards,
+  adminUpdateTournamentStatus,
 } from "@/lib/api";
-import type { AdminPool, Match, Stage, Team, Tournament } from "@/types";
+import type { AdminPool, Match, Stage, Team, Tournament, TournamentStatus } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Tournament selector
@@ -830,11 +832,192 @@ function PoolsPanel({ pools }: { pools: AdminPool[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Tournament status control
+// ---------------------------------------------------------------------------
+
+const STATUS_LABELS: Record<TournamentStatus, string> = {
+  not_started: "Não iniciado",
+  ongoing: "Em andamento",
+  finished: "Encerrado",
+};
+
+const STATUS_COLORS: Record<TournamentStatus, string> = {
+  not_started: "gray",
+  ongoing: "green",
+  finished: "blue",
+};
+
+function TournamentStatusControl({
+  tournament,
+  onUpdated,
+}: {
+  tournament: Tournament;
+  onUpdated: (t: Tournament) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleChange(status: TournamentStatus) {
+    setLoading(true);
+    try {
+      const updated = await adminUpdateTournamentStatus(tournament.id, status);
+      onUpdated(updated);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <HStack gap={2} align="center">
+      <NativeSelect.Root size="xs" w="44" disabled={loading}>
+        <NativeSelect.Field
+          value={tournament.status}
+          onChange={(e) => handleChange(e.target.value as TournamentStatus)}
+        >
+          {(Object.keys(STATUS_LABELS) as TournamentStatus[]).map((s) => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      {loading && <Text fontSize="xs" color="gray.500">Salvando…</Text>}
+    </HStack>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// Awards panel
+// ---------------------------------------------------------------------------
+
+function AwardsPanel({
+  tournament,
+  teams,
+  onUpdated,
+}: {
+  tournament: Tournament;
+  teams: Team[];
+  onUpdated: (t: Tournament) => void;
+}) {
+  const aw = tournament.awards;
+  const [draft, setDraft] = useState({
+    championTeamId: aw.championTeamId ? String(aw.championTeamId) : "",
+    runnerUpTeamId: aw.runnerUpTeamId ? String(aw.runnerUpTeamId) : "",
+    thirdPlaceTeamId: aw.thirdPlaceTeamId ? String(aw.thirdPlaceTeamId) : "",
+    topScorer: aw.topScorer ?? "",
+    bestPlayer: aw.bestPlayer ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      const updated = await adminUpdateTournamentAwards(tournament.id, {
+        championTeamId: draft.championTeamId ? Number(draft.championTeamId) : null,
+        runnerUpTeamId: draft.runnerUpTeamId ? Number(draft.runnerUpTeamId) : null,
+        thirdPlaceTeamId: draft.thirdPlaceTeamId ? Number(draft.thirdPlaceTeamId) : null,
+        topScorer: draft.topScorer || "",
+        bestPlayer: draft.bestPlayer || "",
+      });
+      onUpdated(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Stack gap={4}>
+      <Heading size="sm">Resultados do torneio</Heading>
+      <Text color="gray.500" fontSize="sm">
+        Quando definidos, os pontos de palpites especiais são calculados automaticamente no ranking de cada bolão.
+      </Text>
+      <form onSubmit={handleSubmit}>
+        <Stack gap={4}>
+          <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+            <Stack gap={1}>
+              <Text fontSize="sm" fontWeight="medium">Campeão</Text>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={draft.championTeamId}
+                  onChange={(e) => { setDraft((d) => ({ ...d, championTeamId: e.target.value })); setSaved(false); }}
+                >
+                  <option value="">Não definido</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Stack>
+            <Stack gap={1}>
+              <Text fontSize="sm" fontWeight="medium">Vice-campeão</Text>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={draft.runnerUpTeamId}
+                  onChange={(e) => { setDraft((d) => ({ ...d, runnerUpTeamId: e.target.value })); setSaved(false); }}
+                >
+                  <option value="">Não definido</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Stack>
+            <Stack gap={1}>
+              <Text fontSize="sm" fontWeight="medium">Terceiro lugar</Text>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={draft.thirdPlaceTeamId}
+                  onChange={(e) => { setDraft((d) => ({ ...d, thirdPlaceTeamId: e.target.value })); setSaved(false); }}
+                >
+                  <option value="">Não definido</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Stack>
+            <Stack gap={1}>
+              <Text fontSize="sm" fontWeight="medium">Artilheiro</Text>
+              <Input
+                size="sm"
+                placeholder="Nome do jogador"
+                value={draft.topScorer}
+                onChange={(e) => { setDraft((d) => ({ ...d, topScorer: e.target.value })); setSaved(false); }}
+              />
+            </Stack>
+            <Stack gap={1}>
+              <Text fontSize="sm" fontWeight="medium">Melhor jogador</Text>
+              <Input
+                size="sm"
+                placeholder="Nome do jogador"
+                value={draft.bestPlayer}
+                onChange={(e) => { setDraft((d) => ({ ...d, bestPlayer: e.target.value })); setSaved(false); }}
+              />
+            </Stack>
+          </SimpleGrid>
+          {error && <Text color="red.500" fontSize="sm">{error}</Text>}
+          <HStack gap={3} align="center">
+            <Button type="submit" size="sm" colorPalette="green" loading={saving}>
+              Salvar premiações
+            </Button>
+            {saved && <Text color="green.600" fontSize="sm">✓ Salvo</Text>}
+          </HStack>
+        </Stack>
+      </form>
+    </Stack>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
 // Tournament detail
 // ---------------------------------------------------------------------------
 
 function TournamentDetail({
-  tournament,
+  tournament: initialTournament,
   teams,
   onTeamCreated,
 }: {
@@ -842,6 +1025,7 @@ function TournamentDetail({
   teams: Team[];
   onTeamCreated: (t: Team) => void;
 }) {
+  const [tournament, setTournament] = useState(initialTournament);
   const [stages, setStages] = useState<Stage[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [pools, setPools] = useState<AdminPool[]>([]);
@@ -867,9 +1051,10 @@ function TournamentDetail({
 
   return (
     <Stack gap={6}>
-      <HStack gap={3} align="baseline">
+      <HStack gap={3} align="center" flexWrap="wrap">
         <Heading size="lg">{tournament.name}</Heading>
         <Badge colorPalette="gray" variant="subtle" fontSize="md">{tournament.year}</Badge>
+        <TournamentStatusControl tournament={tournament} onUpdated={setTournament} />
       </HStack>
 
       <Tabs.Root defaultValue="jogos" variant="line">
@@ -877,6 +1062,7 @@ function TournamentDetail({
           <Tabs.Trigger value="jogos">Jogos ({matches.length})</Tabs.Trigger>
           <Tabs.Trigger value="boloes">Bolões ({pools.length})</Tabs.Trigger>
           <Tabs.Trigger value="fases">Fases</Tabs.Trigger>
+          <Tabs.Trigger value="premiacoes">Premiações</Tabs.Trigger>
           <Tabs.Trigger value="times">Times</Tabs.Trigger>
         </Tabs.List>
 
@@ -902,6 +1088,10 @@ function TournamentDetail({
             onCreated={(s) => setStages((prev) => [...prev, s])}
             onUpdated={(s) => setStages((prev) => prev.map((x) => (x.id === s.id ? s : x)))}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="premiacoes" pt={4}>
+          <AwardsPanel tournament={tournament} teams={teams} onUpdated={setTournament} />
         </Tabs.Content>
 
         <Tabs.Content value="times" pt={4}>

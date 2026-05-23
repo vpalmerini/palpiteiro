@@ -1,15 +1,58 @@
 "use client";
 
-import { Badge, Button, Card, Field, Heading, Input, SimpleGrid, Stack, Text, Textarea } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Field,
+  Heading,
+  HStack,
+  Input,
+  Separator,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+} from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createPool } from "@/lib/api";
+import { createPool, type AwardConfigPayload } from "@/lib/api";
+
+type AwardsState = {
+  champion: AwardConfigPayload;
+  runnerUp: AwardConfigPayload;
+  thirdPlace: AwardConfigPayload;
+  topScorer: AwardConfigPayload;
+  bestPlayer: AwardConfigPayload;
+};
+
+const AWARD_LABELS: Record<keyof AwardsState, string> = {
+  champion: "Campeão",
+  runnerUp: "Vice-campeão",
+  thirdPlace: "Terceiro lugar",
+  topScorer: "Artilheiro",
+  bestPlayer: "Melhor jogador",
+};
+
+const DEFAULT_AWARDS: AwardsState = {
+  champion: { enabled: true, points: 15 },
+  runnerUp: { enabled: true, points: 10 },
+  thirdPlace: { enabled: true, points: 7 },
+  topScorer: { enabled: false, points: 10 },
+  bestPlayer: { enabled: false, points: 10 },
+};
 
 export default function NewPoolPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
+
+  function setAwardField(key: keyof AwardsState, field: keyof AwardConfigPayload, value: boolean | number) {
+    setAwards((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,6 +71,7 @@ export default function NewPoolPage() {
           position,
           description: String(form.get(`prize${position}`)),
         })),
+        awards,
       });
       window.localStorage.setItem(`bolao:${pool.slug}:participantId`, pool.creatorParticipantId);
       router.push(`/pools/${pool.slug}`);
@@ -88,6 +132,41 @@ export default function NewPoolPage() {
                 <Input name="prize3" placeholder="R$ 100" />
               </Field.Root>
             </SimpleGrid>
+
+            <Separator />
+
+            <Stack gap={3}>
+              <Heading size="sm">Palpites especiais</Heading>
+              <Text color="gray.600" fontSize="sm">
+                Permita que os participantes palpitem o campeão, vice e terceiro lugar do torneio, além de artilheiro e melhor jogador. Cada acerto vale os pontos configurados.
+              </Text>
+              {(Object.keys(awards) as (keyof AwardsState)[]).map((key) => (
+                <HStack key={key} gap={4} align="center">
+                  <Checkbox.Root
+                    checked={awards[key].enabled}
+                    onCheckedChange={(d) => setAwardField(key, "enabled", Boolean(d.checked))}
+                    flex="1"
+                  >
+                    <Checkbox.HiddenInput />
+                    <Checkbox.Control />
+                    <Checkbox.Label>{AWARD_LABELS[key]}</Checkbox.Label>
+                  </Checkbox.Root>
+                  <HStack gap={2} align="center" opacity={awards[key].enabled ? 1 : 0.4}>
+                    <Input
+                      type="number"
+                      min={1}
+                      w="20"
+                      size="sm"
+                      value={awards[key].points}
+                      onChange={(e) => setAwardField(key, "points", Number(e.target.value))}
+                      disabled={!awards[key].enabled}
+                    />
+                    <Text fontSize="sm" color="gray.500" whiteSpace="nowrap">pts</Text>
+                  </HStack>
+                </HStack>
+              ))}
+            </Stack>
+
             {error ? <Text color="red.600">{error}</Text> : null}
             <Button colorPalette="blue" disabled={isSubmitting} rounded="full" type="submit">
               {isSubmitting ? "Criando..." : "Criar bolão"}

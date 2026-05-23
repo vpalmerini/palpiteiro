@@ -1,4 +1,4 @@
-import type { AdminPool, Match, Pool, Prediction, RankingEntry, Stage, Team, Tournament } from "@/types";
+import type { AdminPool, AwardPrediction, Match, Pool, Prediction, RankingEntry, Stage, Team, Tournament, TournamentStatus } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5001/api";
 
@@ -20,6 +20,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json();
 }
 
+export type AwardConfigPayload = { enabled: boolean; points: number };
+
 export function createPool(payload: {
   name: string;
   description: string;
@@ -27,6 +29,13 @@ export function createPool(payload: {
   creatorEmail: string;
   creatorNickname: string;
   prizes: { position: number; description: string }[];
+  awards: {
+    champion: AwardConfigPayload;
+    runnerUp: AwardConfigPayload;
+    thirdPlace: AwardConfigPayload;
+    topScorer: AwardConfigPayload;
+    bestPlayer: AwardConfigPayload;
+  };
 }) {
   return request<Pool & { creatorParticipantId: string; creatorDisplayName: string }>("/pools", {
     method: "POST",
@@ -158,4 +167,54 @@ export function adminUpdateMatch(
 
 export function adminListPools(tournamentId: number) {
   return request<AdminPool[]>(`/admin/tournaments/${tournamentId}/pools`);
+}
+
+export function listTeams() {
+  return request<Team[]>("/teams");
+}
+
+export function getAwardPrediction(slug: string, participantId: string) {
+  return request<{ isLocked: boolean; prediction: AwardPrediction | null }>(
+    `/pools/${slug}/award-prediction?participantId=${participantId}`,
+  );
+}
+
+export function saveAwardPrediction(
+  slug: string,
+  payload: {
+    participantId: string;
+    championTeamId?: number | null;
+    runnerUpTeamId?: number | null;
+    thirdPlaceTeamId?: number | null;
+    topScorer?: string;
+    bestPlayer?: string;
+  },
+) {
+  return request<AwardPrediction>(`/pools/${slug}/award-prediction`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminUpdateTournamentStatus(tournamentId: number, status: TournamentStatus) {
+  return request<Tournament>(`/admin/tournaments/${tournamentId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function adminUpdateTournamentAwards(
+  tournamentId: number,
+  payload: Partial<{
+    championTeamId: number | null;
+    runnerUpTeamId: number | null;
+    thirdPlaceTeamId: number | null;
+    topScorer: string;
+    bestPlayer: string;
+  }>,
+) {
+  return request<Tournament>(`/admin/tournaments/${tournamentId}/awards`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }

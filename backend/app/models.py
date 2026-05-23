@@ -23,10 +23,26 @@ class Participant(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
 
+class TournamentStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    ONGOING = "ongoing"
+    FINISHED = "finished"
+
+
 class Tournament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False)
     year = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(24), nullable=False, default=TournamentStatus.NOT_STARTED.value)
+    champion_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    runner_up_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    third_place_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    top_scorer = db.Column(db.String(120), nullable=True)
+    best_player = db.Column(db.String(120), nullable=True)
+
+    champion = db.relationship("Team", foreign_keys=[champion_team_id])
+    runner_up = db.relationship("Team", foreign_keys=[runner_up_team_id])
+    third_place = db.relationship("Team", foreign_keys=[third_place_team_id])
 
 
 class Team(db.Model):
@@ -56,6 +72,16 @@ class Pool(db.Model):
     outcome_points = db.Column(db.Integer, nullable=False, default=3)
     one_team_goals_points = db.Column(db.Integer, nullable=False, default=1)
     penalty_bonus_points = db.Column(db.Integer, nullable=False, default=2)
+    predict_champion = db.Column(db.Boolean, nullable=False, default=True)
+    champion_points = db.Column(db.Integer, nullable=False, default=15)
+    predict_runner_up = db.Column(db.Boolean, nullable=False, default=True)
+    runner_up_points = db.Column(db.Integer, nullable=False, default=10)
+    predict_third_place = db.Column(db.Boolean, nullable=False, default=True)
+    third_place_points = db.Column(db.Integer, nullable=False, default=7)
+    predict_top_scorer = db.Column(db.Boolean, nullable=False, default=False)
+    top_scorer_points = db.Column(db.Integer, nullable=False, default=10)
+    predict_best_player = db.Column(db.Boolean, nullable=False, default=False)
+    best_player_points = db.Column(db.Integer, nullable=False, default=10)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     tournament = db.relationship("Tournament", backref="pools")
@@ -136,3 +162,22 @@ class ScoreEntry(db.Model):
     calculated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     prediction = db.relationship("Prediction", backref="score_entry")
+
+
+class AwardPrediction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    pool_id = db.Column(db.Integer, db.ForeignKey("pool.id"), nullable=False)
+    participant_id = db.Column(db.Integer, db.ForeignKey("participant.id"), nullable=False)
+    champion_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    runner_up_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    third_place_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    top_scorer = db.Column(db.String(120), nullable=True)
+    best_player = db.Column(db.String(120), nullable=True)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+
+    pool = db.relationship("Pool", backref="award_predictions")
+    participant = db.relationship("Participant", backref="award_predictions")
+    champion = db.relationship("Team", foreign_keys=[champion_team_id])
+    runner_up = db.relationship("Team", foreign_keys=[runner_up_team_id])
+    third_place = db.relationship("Team", foreign_keys=[third_place_team_id])
+    __table_args__ = (db.UniqueConstraint("pool_id", "participant_id", name="uq_award_prediction"),)

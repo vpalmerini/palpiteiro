@@ -3,6 +3,11 @@ export type Prize = {
   description: string;
 };
 
+export type AwardConfig = {
+  enabled: boolean;
+  points: number;
+};
+
 export type Pool = {
   id: number;
   slug: string;
@@ -16,6 +21,23 @@ export type Pool = {
     penaltyBonus: number;
   };
   prizes: Prize[];
+  awards: {
+    champion: AwardConfig;
+    runnerUp: AwardConfig;
+    thirdPlace: AwardConfig;
+    topScorer: AwardConfig;
+    bestPlayer: AwardConfig;
+  };
+};
+
+export type AwardPrediction = {
+  id: number;
+  championTeamId: number | null;
+  runnerUpTeamId: number | null;
+  thirdPlaceTeamId: number | null;
+  topScorer: string | null;
+  bestPlayer: string | null;
+  updatedAt: string;
 };
 
 export type Team = {
@@ -60,15 +82,29 @@ export type RankingEntry = {
   points: number;
   exactScores: number;
   outcomeHits: number;
+  awardPoints: number;
 };
+
+export type TournamentStatus = "not_started" | "ongoing" | "finished";
 
 export type Tournament = {
   id: number;
   name: string;
   year: number;
+  status: TournamentStatus;
   stagesCount: number;
   matchesCount: number;
   poolsCount: number;
+  awards: {
+    championTeamId: number | null;
+    championTeam: { id: number; name: string; shortName: string } | null;
+    runnerUpTeamId: number | null;
+    runnerUpTeam: { id: number; name: string; shortName: string } | null;
+    thirdPlaceTeamId: number | null;
+    thirdPlaceTeam: { id: number; name: string; shortName: string } | null;
+    topScorer: string | null;
+    bestPlayer: string | null;
+  };
 };
 
 export type Stage = {
