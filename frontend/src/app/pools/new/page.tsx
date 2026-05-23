@@ -22,11 +22,14 @@ export default function NewPoolPage() {
         name: String(form.get("name")),
         description: String(form.get("description")),
         creatorName: String(form.get("creatorName")),
+        creatorEmail: String(form.get("creatorEmail")),
+        creatorNickname: String(form.get("creatorNickname") || ""),
         prizes: [1, 2, 3].map((position) => ({
           position,
           description: String(form.get(`prize${position}`)),
         })),
       });
+      window.localStorage.setItem(`bolao:${pool.slug}:participantId`, pool.creatorParticipantId);
       router.push(`/pools/${pool.slug}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível criar o bolão.");
@@ -55,8 +58,17 @@ export default function NewPoolPage() {
               <Input name="name" placeholder="Bolão da firma" />
             </Field.Root>
             <Field.Root required>
-              <Field.Label>Nome do criador</Field.Label>
+              <Field.Label>Nome</Field.Label>
               <Input name="creatorName" placeholder="Victor" />
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>E-mail</Field.Label>
+              <Input name="creatorEmail" placeholder="seu-email@exemplo.com" type="email" />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Nickname</Field.Label>
+              <Input name="creatorNickname" placeholder="Como você quer aparecer no ranking" />
+              <Field.HelperText>Opcional. Se não preencher, o nome do criador será usado.</Field.HelperText>
             </Field.Root>
             <Field.Root>
               <Field.Label>Descrição</Field.Label>

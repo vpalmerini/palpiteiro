@@ -24,9 +24,11 @@ export function createPool(payload: {
   name: string;
   description: string;
   creatorName: string;
+  creatorEmail: string;
+  creatorNickname: string;
   prizes: { position: number; description: string }[];
 }) {
-  return request<Pool>("/pools", {
+  return request<Pool & { creatorParticipantId: string; creatorDisplayName: string }>("/pools", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -36,7 +38,7 @@ export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
 }
 
-export function joinPool(slug: string, payload: { name: string; email?: string; participantId?: string }) {
+export function joinPool(slug: string, payload: { name: string; email: string; nickname?: string; participantId?: string }) {
   return request<{ participantId: string; displayName: string; pool: Pool }>(`/pools/${slug}/join`, {
     method: "POST",
     body: JSON.stringify(payload),

@@ -29,6 +29,7 @@ export default function PoolPage({ params }: PageProps) {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -56,13 +57,21 @@ export default function PoolPage({ params }: PageProps) {
     const form = new FormData(event.currentTarget);
     const result = await joinPool(slug, {
       name: String(form.get("name")),
-      email: String(form.get("email") || ""),
+      email: String(form.get("email")),
+      nickname: String(form.get("nickname") || ""),
       participantId: participantId ?? undefined,
     });
     window.localStorage.setItem(`bolao:${slug}:participantId`, result.participantId);
     setParticipantId(result.participantId);
     setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
     setRanking(await getRanking(slug));
+  }
+
+  async function copyPublicLink() {
+    if (!publicUrl) return;
+
+    await navigator.clipboard.writeText(publicUrl);
+    setCopyMessage("Link copiado para a área de transferência.");
   }
 
   if (!pool) {
@@ -81,33 +90,51 @@ export default function PoolPage({ params }: PageProps) {
           </Heading>
           <Text color="gray.600">{pool.description || "Sem descrição."}</Text>
           <Input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
-          <Button asChild alignSelf="flex-start" colorPalette="blue" rounded="full">
-            <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
+          <Button alignSelf="flex-start" colorPalette="blue" onClick={copyPublicLink} rounded="full">
+            Copiar link
           </Button>
+          {copyMessage ? <Text color="green.600">{copyMessage}</Text> : null}
         </Card.Body>
       </Card.Root>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>
-            <Card.Title>Entrar no bolão</Card.Title>
-            {participantId ? <Text color="green.600">Você já está participando neste navegador.</Text> : null}
-            <form onSubmit={onJoin}>
-              <Stack gap={4}>
-                <Field.Root required>
-                  <Field.Label>Nome exibido</Field.Label>
-                  <Input name="name" placeholder="Seu nome" />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>E-mail opcional</Field.Label>
-                  <Input name="email" placeholder="seu-email@exemplo.com" type="email" />
-                </Field.Root>
+            {participantId ? (
+              <>
+                <Card.Title>Você já está no bolão</Card.Title>
+                <Text color="green.600">Sua participação está confirmada neste navegador.</Text>
                 {message ? <Text color="green.600">{message}</Text> : null}
-                <Button colorPalette="blue" rounded="full" type="submit">
-                  Participar
+                <Button asChild alignSelf="flex-start" color="white" colorPalette="blue" rounded="full">
+                  <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
                 </Button>
-              </Stack>
-            </form>
+              </>
+            ) : (
+              <>
+                <Card.Title>Entrar no bolão</Card.Title>
+                <form onSubmit={onJoin}>
+                  <Stack gap={4}>
+                    <Field.Root required>
+                      <Field.Label>Nome</Field.Label>
+                      <Input name="name" placeholder="Seu nome" />
+                    </Field.Root>
+                    <Field.Root>
+                      <Field.Label>Nickname</Field.Label>
+                      <Input name="nickname" placeholder="Como você quer aparecer no ranking" />
+                      <Field.HelperText>Opcional. Se não preencher, seu nome será usado.</Field.HelperText>
+                    </Field.Root>
+                    <Field.Root required>
+                      <Field.Label>E-mail</Field.Label>
+                      <Input name="email" placeholder="seu-email@exemplo.com" type="email" />
+                    </Field.Root>
+                    {message ? <Text color="green.600">{message}</Text> : null}
+                    <Button colorPalette="blue" rounded="full" type="submit">
+                      Participar
+                    </Button>
+                  </Stack>
+                </form>
+              </>
+            )}
           </Card.Body>
         </Card.Root>
 
@@ -163,7 +190,7 @@ export default function PoolPage({ params }: PageProps) {
           <Stack gap={3}>
             {matches.map((match) => (
               <Card.Root key={match.id} rounded="xl" variant="outline">
-                <Card.Body gap={2}>
+                <Card.Body gap={3}>
                   <Text fontWeight="bold">
                     {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
                   </Text>
@@ -171,6 +198,9 @@ export default function PoolPage({ params }: PageProps) {
                     {match.stage.name} · {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
                     {match.isLocked ? "palpites bloqueados" : "palpites abertos"}
                   </Text>
+                  <Button asChild alignSelf="flex-start" colorPalette="blue" rounded="full" size="sm" variant="subtle">
+                    <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
+                  </Button>
                 </Card.Body>
               </Card.Root>
             ))}

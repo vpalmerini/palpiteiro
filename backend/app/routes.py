@@ -143,6 +143,22 @@ def _recalculate_scores(pool: Pool):
         entry.penalty_hit = score.penalty_hit
 
 
+def _ensure_creator_membership(pool: Pool):
+    if PoolParticipant.query.filter_by(pool_id=pool.id).first() is not None:
+        return
+
+    creator = Participant(name=pool.creator_name)
+    db.session.add(creator)
+    db.session.flush()
+    db.session.add(
+        PoolParticipant(
+            pool_id=pool.id,
+            participant_id=creator.id,
+            display_name=pool.creator_name,
+        )
+    )
+
+
 def seed_database() -> str:
     if Tournament.query.first() is not None:
         return "already_seeded"
@@ -204,9 +220,9 @@ def health():
 @api.post("/pools")
 def create_pool():
     data = _json()
-    required = ["name", "creatorName"]
+    required = ["name", "creatorName", "creatorEmail"]
     if any(not data.get(field) for field in required):
-        abort(400, description="name and creatorName are required")
+        abort(400, description="name, creatorName and creatorEmail are required")
 
     tournament = Tournament.query.order_by(Tournament.id).first()
     if tournament is None:
@@ -217,11 +233,15 @@ def create_pool():
         slug = token_urlsafe(8)
 
     scoring = data.get("scoring") or {}
+    creator_name = data["creatorName"].strip()
+    creator_email = data["creatorEmail"].strip()
+    creator_nickname = (data.get("creatorNickname") or "").strip()
+    creator_display_name = creator_nickname or creator_name
     pool = Pool(
         slug=slug,
         name=data["name"].strip(),
         description=(data.get("description") or "").strip() or None,
-        creator_name=data["creatorName"].strip(),
+        creator_name=creator_name,
         tournament_id=tournament.id,
         exact_score_points=int(scoring.get("exactScore", 5)),
         outcome_points=int(scoring.get("outcome", 3)),
@@ -237,8 +257,22 @@ def create_pool():
         description = (prize_data or {}).get("description") or f"Premio do {position}o lugar"
         db.session.add(PoolPrize(pool_id=pool.id, position=position, description=description.strip()))
 
+    creator = Participant(name=creator_name, email=creator_email)
+    db.session.add(creator)
+    db.session.flush()
+    db.session.add(
+        PoolParticipant(
+            pool_id=pool.id,
+            participant_id=creator.id,
+            display_name=creator_display_name,
+        )
+    )
+
     db.session.commit()
-    return jsonify(_pool_payload(pool)), 201
+    payload = _pool_payload(pool)
+    payload["creatorParticipantId"] = creator.public_id
+    payload["creatorDisplayName"] = creator_display_name
+    return jsonify(payload), 201
 
 
 @api.get("/pools/<slug>")
@@ -251,8 +285,11 @@ def join_pool(slug):
     pool = _pool_or_404(slug)
     data = _json()
     name = (data.get("name") or "").strip()
-    if not name:
-        abort(400, description="name is required")
+    email = (data.get("email") or "").strip()
+    nickname = (data.get("nickname") or "").strip()
+    display_name = nickname or name
+    if not name or not email:
+        abort(400, description="name and email are required")
 
     participant_public_id = data.get("participantId")
     participant = (
@@ -261,9 +298,12 @@ def join_pool(slug):
         else None
     )
     if participant is None:
-        participant = Participant(name=name, email=(data.get("email") or "").strip() or None)
+        participant = Participant(name=name, email=email)
         db.session.add(participant)
         db.session.flush()
+    else:
+        participant.name = name
+        participant.email = email
 
     membership = PoolParticipant.query.filter_by(
         pool_id=pool.id,
@@ -273,11 +313,11 @@ def join_pool(slug):
         membership = PoolParticipant(
             pool_id=pool.id,
             participant_id=participant.id,
-            display_name=name,
+            display_name=display_name,
         )
         db.session.add(membership)
     else:
-        membership.display_name = name
+        membership.display_name = display_name
 
     db.session.commit()
     return jsonify(
@@ -355,6 +395,7 @@ def upsert_prediction(slug):
 @api.get("/pools/<slug>/ranking")
 def get_ranking(slug):
     pool = _pool_or_404(slug)
+    _ensure_creator_membership(pool)
     _recalculate_scores(pool)
     db.session.commit()
 
