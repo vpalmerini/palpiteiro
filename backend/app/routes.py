@@ -463,3 +463,209 @@ def update_match_result(match_id):
 
     db.session.commit()
     return jsonify(_match_payload(match))
+
+
+# ---------------------------------------------------------------------------
+# Admin — tournaments
+# ---------------------------------------------------------------------------
+
+def _tournament_payload(tournament: Tournament):
+    return {
+        "id": tournament.id,
+        "name": tournament.name,
+        "year": tournament.year,
+        "stagesCount": len(tournament.stages),
+        "matchesCount": len(tournament.matches),
+        "poolsCount": len(tournament.pools),
+    }
+
+
+def _stage_payload(stage: Stage):
+    return {
+        "id": stage.id,
+        "name": stage.name,
+        "order": stage.order,
+        "isKnockout": stage.is_knockout,
+    }
+
+
+def _team_full_payload(team: Team):
+    return {"id": team.id, "name": team.name, "shortName": team.short_name}
+
+
+@api.get("/admin/tournaments")
+def list_tournaments():
+    tournaments = Tournament.query.order_by(Tournament.year.desc(), Tournament.id.desc()).all()
+    return jsonify([_tournament_payload(t) for t in tournaments])
+
+
+@api.post("/admin/tournaments")
+def create_tournament():
+    data = _json()
+    name = (data.get("name") or "").strip()
+    year = data.get("year")
+    if not name or not year:
+        abort(400, description="name and year are required")
+    tournament = Tournament(name=name, year=int(year))
+    db.session.add(tournament)
+    db.session.commit()
+    return jsonify(_tournament_payload(tournament)), 201
+
+
+@api.get("/admin/tournaments/<int:tournament_id>/stages")
+def list_stages(tournament_id):
+    tournament = Tournament.query.get_or_404(tournament_id)
+    stages = sorted(tournament.stages, key=lambda s: s.order)
+    return jsonify([_stage_payload(s) for s in stages])
+
+
+@api.post("/admin/tournaments/<int:tournament_id>/stages")
+def create_stage(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    data = _json()
+    name = (data.get("name") or "").strip()
+    order = data.get("order")
+    if not name or order is None:
+        abort(400, description="name and order are required")
+    stage = Stage(
+        tournament_id=tournament_id,
+        name=name,
+        order=int(order),
+        is_knockout=bool(data.get("isKnockout", False)),
+    )
+    db.session.add(stage)
+    db.session.commit()
+    return jsonify(_stage_payload(stage)), 201
+
+
+@api.patch("/admin/stages/<int:stage_id>")
+def update_stage(stage_id):
+    stage = Stage.query.get_or_404(stage_id)
+    data = _json()
+    if "name" in data:
+        stage.name = (data["name"] or "").strip() or stage.name
+    if "order" in data:
+        stage.order = int(data["order"])
+    if "isKnockout" in data:
+        stage.is_knockout = bool(data["isKnockout"])
+    db.session.commit()
+    return jsonify(_stage_payload(stage))
+
+
+# ---------------------------------------------------------------------------
+# Admin — teams
+# ---------------------------------------------------------------------------
+
+@api.get("/admin/teams")
+def list_teams():
+    teams = Team.query.order_by(Team.name).all()
+    return jsonify([_team_full_payload(t) for t in teams])
+
+
+@api.post("/admin/teams")
+def create_team():
+    data = _json()
+    name = (data.get("name") or "").strip()
+    short_name = (data.get("shortName") or "").strip()
+    if not name or not short_name:
+        abort(400, description="name and shortName are required")
+    team = Team(name=name, short_name=short_name)
+    db.session.add(team)
+    db.session.commit()
+    return jsonify(_team_full_payload(team)), 201
+
+
+# ---------------------------------------------------------------------------
+# Admin — matches
+# ---------------------------------------------------------------------------
+
+@api.get("/admin/tournaments/<int:tournament_id>/matches")
+def list_tournament_matches(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    matches = (
+        Match.query.filter_by(tournament_id=tournament_id)
+        .join(Stage)
+        .order_by(Stage.order, Match.starts_at)
+        .all()
+    )
+    return jsonify([_match_payload(m) for m in matches])
+
+
+@api.post("/admin/tournaments/<int:tournament_id>/matches")
+def create_match(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    data = _json()
+    stage_id = data.get("stageId")
+    starts_at_raw = data.get("startsAt")
+    if not stage_id or not starts_at_raw:
+        abort(400, description="stageId and startsAt are required")
+    stage = Stage.query.filter_by(id=int(stage_id), tournament_id=tournament_id).first_or_404()
+    match = Match(
+        tournament_id=tournament_id,
+        stage_id=stage.id,
+        home_team_id=_parse_optional_int(data.get("homeTeamId")),
+        away_team_id=_parse_optional_int(data.get("awayTeamId")),
+        starts_at=_parse_starts_at(starts_at_raw),
+    )
+    db.session.add(match)
+    db.session.commit()
+    return jsonify(_match_payload(match)), 201
+
+
+@api.patch("/admin/matches/<int:match_id>")
+def update_match(match_id):
+    match = Match.query.get_or_404(match_id)
+    data = _json()
+
+    if "stageId" in data:
+        stage = Stage.query.filter_by(id=int(data["stageId"]), tournament_id=match.tournament_id).first_or_404()
+        match.stage_id = stage.id
+    if "homeTeamId" in data:
+        match.home_team_id = _parse_optional_int(data["homeTeamId"])
+    if "awayTeamId" in data:
+        match.away_team_id = _parse_optional_int(data["awayTeamId"])
+    if "startsAt" in data:
+        match.starts_at = _parse_starts_at(data["startsAt"])
+    if "status" in data and data["status"] in [s.value for s in MatchStatus]:
+        match.status = data["status"]
+
+    if "homeScore" in data and "awayScore" in data:
+        home_score = int(data["homeScore"])
+        away_score = int(data["awayScore"])
+        went_to_penalties = match.stage.is_knockout and home_score == away_score
+        penalty_winner_team_id = _parse_optional_int(data.get("penaltyWinnerTeamId"))
+        if went_to_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
+            abort(400, description="penalty winner is required for knockout draws")
+        match.home_score = home_score
+        match.away_score = away_score
+        match.went_to_penalties = went_to_penalties
+        match.penalty_winner_team_id = penalty_winner_team_id if went_to_penalties else None
+        match.status = MatchStatus.FINISHED.value
+        for pool in Pool.query.filter_by(tournament_id=match.tournament_id).all():
+            _recalculate_scores(pool)
+
+    db.session.commit()
+    return jsonify(_match_payload(match))
+
+
+# ---------------------------------------------------------------------------
+# Admin — pools per tournament
+# ---------------------------------------------------------------------------
+
+@api.get("/admin/tournaments/<int:tournament_id>/pools")
+def list_tournament_pools(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    pools = Pool.query.filter_by(tournament_id=tournament_id).order_by(Pool.created_at.desc()).all()
+    return jsonify(
+        [
+            {
+                "id": pool.id,
+                "slug": pool.slug,
+                "name": pool.name,
+                "creatorName": pool.creator_name,
+                "participantsCount": len(pool.memberships),
+                "createdAt": _as_aware_utc(pool.created_at).isoformat(),
+            }
+            for pool in pools
+        ]
+    )

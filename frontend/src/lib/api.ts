@@ -1,4 +1,4 @@
-import type { Match, Pool, Prediction, RankingEntry } from "@/types";
+import type { AdminPool, Match, Pool, Prediction, RankingEntry, Stage, Team, Tournament } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5001/api";
 
@@ -71,4 +71,91 @@ export function savePrediction(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+export function adminListTournaments() {
+  return request<Tournament[]>("/admin/tournaments");
+}
+
+export function adminCreateTournament(payload: { name: string; year: number }) {
+  return request<Tournament>("/admin/tournaments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminListStages(tournamentId: number) {
+  return request<Stage[]>(`/admin/tournaments/${tournamentId}/stages`);
+}
+
+export function adminCreateStage(
+  tournamentId: number,
+  payload: { name: string; order: number; isKnockout: boolean },
+) {
+  return request<Stage>(`/admin/tournaments/${tournamentId}/stages`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminUpdateStage(
+  stageId: number,
+  payload: Partial<{ name: string; order: number; isKnockout: boolean }>,
+) {
+  return request<Stage>(`/admin/stages/${stageId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminListTeams() {
+  return request<Team[]>("/admin/teams");
+}
+
+export function adminCreateTeam(payload: { name: string; shortName: string }) {
+  return request<Team>("/admin/teams", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminListMatches(tournamentId: number) {
+  return request<Match[]>(`/admin/tournaments/${tournamentId}/matches`);
+}
+
+export function adminCreateMatch(
+  tournamentId: number,
+  payload: { stageId: number; startsAt: string; homeTeamId?: number | null; awayTeamId?: number | null },
+) {
+  return request<Match>(`/admin/tournaments/${tournamentId}/matches`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminUpdateMatch(
+  matchId: number,
+  payload: Partial<{
+    stageId: number;
+    homeTeamId: number | null;
+    awayTeamId: number | null;
+    startsAt: string;
+    status: string;
+    homeScore: number;
+    awayScore: number;
+    penaltyWinnerTeamId: number | null;
+  }>,
+) {
+  return request<Match>(`/admin/matches/${matchId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminListPools(tournamentId: number) {
+  return request<AdminPool[]>(`/admin/tournaments/${tournamentId}/pools`);
 }

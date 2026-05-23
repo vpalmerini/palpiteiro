@@ -61,3 +61,28 @@ export type RankingEntry = {
   exactScores: number;
   outcomeHits: number;
 };
+
+export type Tournament = {
+  id: number;
+  name: string;
+  year: number;
+  stagesCount: number;
+  matchesCount: number;
+  poolsCount: number;
+};
+
+export type Stage = {
+  id: number;
+  name: string;
+  order: number;
+  isKnockout: boolean;
+};
+
+export type AdminPool = {
+  id: number;
+  slug: string;
+  name: string;
+  creatorName: string;
+  participantsCount: number;
+  createdAt: string;
+};

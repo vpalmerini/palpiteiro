@@ -13,11 +13,16 @@ export function AppNav() {
       <Link href="/" style={{ fontWeight: 800 }}>
         Bolão da Copa
       </Link>
-      {showCreateButton ? (
-        <Button asChild colorPalette="blue" variant="subtle" rounded="full">
-          <Link href="/pools/new">Criar bolão</Link>
+      <Flex align="center" gap={2}>
+        <Button asChild colorPalette="gray" variant="ghost" rounded="full" size="sm">
+          <Link href="/admin">Admin</Link>
         </Button>
-      ) : null}
+        {showCreateButton ? (
+          <Button asChild colorPalette="blue" variant="subtle" rounded="full">
+            <Link href="/pools/new">Criar bolão</Link>
+          </Button>
+        ) : null}
+      </Flex>
     </Flex>
   );
 }
