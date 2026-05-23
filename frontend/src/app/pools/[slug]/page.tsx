@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  Heading,
+  Input,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+} from "@chakra-ui/react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -54,92 +66,117 @@ export default function PoolPage({ params }: PageProps) {
   }
 
   if (!pool) {
-    return <p>Carregando bolão...</p>;
+    return <Text>Carregando bolão...</Text>;
   }
 
   return (
-    <div className="stack">
-      <section className="card stack">
-        <span className="pill">Link público</span>
-        <h1 style={{ fontSize: "3rem" }}>{pool.name}</h1>
-        <p>{pool.description || "Sem descrição."}</p>
-        <input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link className="button" href={`/pools/${slug}/predictions`}>
-            Fazer palpites
-          </Link>
-        </div>
-      </section>
+    <Stack gap={6}>
+      <Card.Root as="section" rounded="2xl" shadow="lg">
+        <Card.Body gap={4}>
+          <Badge alignSelf="flex-start" colorPalette="blue" rounded="full" px={3} py={1}>
+            Link público
+          </Badge>
+          <Heading as="h1" fontSize={{ base: "3xl", md: "5xl" }}>
+            {pool.name}
+          </Heading>
+          <Text color="gray.600">{pool.description || "Sem descrição."}</Text>
+          <Input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
+          <Button asChild alignSelf="flex-start" colorPalette="blue" rounded="full">
+            <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
+          </Button>
+        </Card.Body>
+      </Card.Root>
 
-      <div className="grid">
-        <section className="card stack">
-          <h2>Entrar no bolão</h2>
-          {participantId ? <p className="notice">Você já está participando neste navegador.</p> : null}
-          <form className="stack" onSubmit={onJoin}>
-            <label>
-              Nome exibido
-              <input name="name" required placeholder="Seu nome" />
-            </label>
-            <label>
-              E-mail opcional
-              <input name="email" type="email" placeholder="seu-email@exemplo.com" />
-            </label>
-            {message ? <p className="notice">{message}</p> : null}
-            <button className="button" type="submit">
-              Participar
-            </button>
-          </form>
-        </section>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+        <Card.Root as="section" rounded="2xl">
+          <Card.Body gap={4}>
+            <Card.Title>Entrar no bolão</Card.Title>
+            {participantId ? <Text color="green.600">Você já está participando neste navegador.</Text> : null}
+            <form onSubmit={onJoin}>
+              <Stack gap={4}>
+                <Field.Root required>
+                  <Field.Label>Nome exibido</Field.Label>
+                  <Input name="name" placeholder="Seu nome" />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>E-mail opcional</Field.Label>
+                  <Input name="email" placeholder="seu-email@exemplo.com" type="email" />
+                </Field.Root>
+                {message ? <Text color="green.600">{message}</Text> : null}
+                <Button colorPalette="blue" rounded="full" type="submit">
+                  Participar
+                </Button>
+              </Stack>
+            </form>
+          </Card.Body>
+        </Card.Root>
 
-        <section className="card stack">
-          <h2>Prêmios</h2>
-          {pool.prizes.map((prize) => (
-            <p key={prize.position}>
-              <strong>{prize.position}º lugar:</strong> {prize.description}
-            </p>
-          ))}
-        </section>
-      </div>
+        <Card.Root as="section" rounded="2xl">
+          <Card.Body gap={4}>
+            <Card.Title>Prêmios</Card.Title>
+            <Stack gap={3}>
+              {pool.prizes.map((prize) => (
+                <Text color="gray.700" key={prize.position}>
+                  <Text as="span" fontWeight="bold">
+                    {prize.position}º lugar:
+                  </Text>{" "}
+                  {prize.description}
+                </Text>
+              ))}
+            </Stack>
+          </Card.Body>
+        </Card.Root>
+      </SimpleGrid>
 
-      <section className="card stack">
-        <h2>Ranking</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Posição</th>
-              <th>Participante</th>
-              <th>Pontos</th>
-              <th>Placares exatos</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranking.map((entry) => (
-              <tr key={entry.participantId}>
-                <td>{entry.position}</td>
-                <td>{entry.displayName}</td>
-                <td>{entry.points}</td>
-                <td>{entry.exactScores}</td>
-              </tr>
+      <Card.Root as="section" rounded="2xl">
+        <Card.Body gap={4}>
+          <Card.Title>Ranking</Card.Title>
+          <Table.ScrollArea>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Posição</Table.ColumnHeader>
+                  <Table.ColumnHeader>Participante</Table.ColumnHeader>
+                  <Table.ColumnHeader>Pontos</Table.ColumnHeader>
+                  <Table.ColumnHeader>Placares exatos</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {ranking.map((entry) => (
+                  <Table.Row key={entry.participantId}>
+                    <Table.Cell>{entry.position}</Table.Cell>
+                    <Table.Cell>{entry.displayName}</Table.Cell>
+                    <Table.Cell>{entry.points}</Table.Cell>
+                    <Table.Cell>{entry.exactScores}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Table.ScrollArea>
+          {ranking.length === 0 ? <Text color="gray.600">Nenhum participante ainda.</Text> : null}
+        </Card.Body>
+      </Card.Root>
+
+      <Card.Root as="section" rounded="2xl">
+        <Card.Body gap={4}>
+          <Card.Title>Próximos jogos</Card.Title>
+          <Stack gap={3}>
+            {matches.map((match) => (
+              <Card.Root key={match.id} rounded="xl" variant="outline">
+                <Card.Body gap={2}>
+                  <Text fontWeight="bold">
+                    {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
+                  </Text>
+                  <Text color="gray.600">
+                    {match.stage.name} · {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
+                    {match.isLocked ? "palpites bloqueados" : "palpites abertos"}
+                  </Text>
+                </Card.Body>
+              </Card.Root>
             ))}
-          </tbody>
-        </table>
-        {ranking.length === 0 ? <p>Nenhum participante ainda.</p> : null}
-      </section>
-
-      <section className="card stack">
-        <h2>Próximos jogos</h2>
-        {matches.map((match) => (
-          <div className="card" key={match.id} style={{ boxShadow: "none" }}>
-            <strong>
-              {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
-            </strong>
-            <p>
-              {match.stage.name} · {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
-              {match.isLocked ? "palpites bloqueados" : "palpites abertos"}
-            </p>
-          </div>
-        ))}
-      </section>
-    </div>
+          </Stack>
+        </Card.Body>
+      </Card.Root>
+    </Stack>
   );
 }

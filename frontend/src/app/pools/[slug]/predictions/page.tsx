@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  Heading,
+  Input,
+  NativeSelect,
+  SimpleGrid,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -82,23 +94,29 @@ export default function PredictionsPage({ params }: PageProps) {
   }
 
   if (!pool) {
-    return <p>Carregando palpites...</p>;
+    return <Text>Carregando palpites...</Text>;
   }
 
   return (
-    <div className="stack">
-      <section className="card stack">
-        <span className="pill">Palpites</span>
-        <h1 style={{ fontSize: "3rem" }}>{pool.name}</h1>
-        <p>
+    <Stack gap={6}>
+      <Card.Root as="section" rounded="2xl" shadow="lg">
+        <Card.Body gap={4}>
+          <Badge alignSelf="flex-start" colorPalette="blue" rounded="full" px={3} py={1}>
+            Palpites
+          </Badge>
+          <Heading as="h1" fontSize={{ base: "3xl", md: "5xl" }}>
+            {pool.name}
+          </Heading>
+          <Text color="gray.600">
           Registre placares antes do início de cada jogo. Em mata-mata, palpite empatado significa decisão nos pênaltis.
-        </p>
-        <Link className="button secondary" href={`/pools/${slug}`}>
-          Voltar ao ranking
-        </Link>
-        {!participantId ? <p className="notice">Entre no bolão antes de registrar palpites.</p> : null}
-        {message ? <p className="notice">{message}</p> : null}
-      </section>
+          </Text>
+          <Button asChild alignSelf="flex-start" colorPalette="blue" rounded="full" variant="subtle">
+            <Link href={`/pools/${slug}`}>Voltar ao ranking</Link>
+          </Button>
+          {!participantId ? <Text color="green.600">Entre no bolão antes de registrar palpites.</Text> : null}
+          {message ? <Text color="green.600">{message}</Text> : null}
+        </Card.Body>
+      </Card.Root>
 
       {matches.map((match) => {
         const prediction = predictions[match.id];
@@ -109,75 +127,82 @@ export default function PredictionsPage({ params }: PageProps) {
           match.stage.isKnockout && homeScore !== "" && awayScore !== "" && Number(homeScore) === Number(awayScore);
 
         return (
-          <section className="card stack" key={match.id}>
-            <div>
-              <span className="pill">{match.stage.name}</span>
-              <h2>
+          <Card.Root as="section" key={match.id} rounded="2xl">
+            <Card.Body gap={4}>
+              <Stack gap={2}>
+                <Badge alignSelf="flex-start" colorPalette={match.stage.isKnockout ? "purple" : "blue"} rounded="full">
+                  {match.stage.name}
+                </Badge>
+                <Heading as="h2" fontSize="2xl">
                 {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
-              </h2>
-              <p>
-                Fecha em {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
-                {match.isLocked ? "bloqueado" : "aberto"}
-              </p>
-            </div>
+                </Heading>
+                <Text color="gray.600">
+                  Fecha em {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
+                  {match.isLocked ? "bloqueado" : "aberto"}
+                </Text>
+              </Stack>
 
-            <form className="stack" onSubmit={(event) => onSubmit(event, match)}>
-              <div className="grid">
-                <label>
-                  Gols {match.homeTeam?.shortName ?? "mandante"}
-                  <input
-                    disabled={match.isLocked}
-                    min={0}
-                    name="homeScore"
-                    onChange={(event) => updateScoreDraft(match.id, "homeScore", event.target.value)}
-                    required
-                    type="number"
-                    value={homeScore}
-                  />
-                </label>
-                <label>
-                  Gols {match.awayTeam?.shortName ?? "visitante"}
-                  <input
-                    disabled={match.isLocked}
-                    min={0}
-                    name="awayScore"
-                    onChange={(event) => updateScoreDraft(match.id, "awayScore", event.target.value)}
-                    required
-                    type="number"
-                    value={awayScore}
-                  />
-                </label>
-              </div>
+              <form onSubmit={(event) => onSubmit(event, match)}>
+                <Stack gap={4}>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                    <Field.Root required>
+                      <Field.Label>Gols {match.homeTeam?.shortName ?? "mandante"}</Field.Label>
+                      <Input
+                        disabled={match.isLocked}
+                        min={0}
+                        name="homeScore"
+                        onChange={(event) => updateScoreDraft(match.id, "homeScore", event.target.value)}
+                        required
+                        type="number"
+                        value={homeScore}
+                      />
+                    </Field.Root>
+                    <Field.Root required>
+                      <Field.Label>Gols {match.awayTeam?.shortName ?? "visitante"}</Field.Label>
+                      <Input
+                        disabled={match.isLocked}
+                        min={0}
+                        name="awayScore"
+                        onChange={(event) => updateScoreDraft(match.id, "awayScore", event.target.value)}
+                        required
+                        type="number"
+                        value={awayScore}
+                      />
+                    </Field.Root>
+                  </SimpleGrid>
 
-              {match.stage.isKnockout ? (
-                <div className="stack">
-                  <p>
-                    Se o palpite for empate, o jogo será considerado decidido nos pênaltis. Nesse caso, escolha o
-                    vencedor abaixo.
-                  </p>
-                  <label>
-                    Vencedor nos pênaltis
-                    <select
-                      defaultValue={prediction?.penaltyWinnerTeamId ?? ""}
-                      disabled={match.isLocked || !isPredictedKnockoutDraw}
-                      name="penaltyWinnerTeamId"
-                      required={isPredictedKnockoutDraw}
-                    >
-                      <option value="">Selecione se o placar for empate</option>
-                      {match.homeTeam ? <option value={match.homeTeam.id}>{match.homeTeam.name}</option> : null}
-                      {match.awayTeam ? <option value={match.awayTeam.id}>{match.awayTeam.name}</option> : null}
-                    </select>
-                  </label>
-                </div>
-              ) : null}
+                  {match.stage.isKnockout ? (
+                    <Stack gap={3}>
+                      <Text color="gray.600">
+                        Se o palpite for empate, o jogo será considerado decidido nos pênaltis. Nesse caso, escolha o
+                        vencedor abaixo.
+                      </Text>
+                      <Field.Root required={isPredictedKnockoutDraw}>
+                        <Field.Label>Vencedor nos pênaltis</Field.Label>
+                        <NativeSelect.Root disabled={match.isLocked || !isPredictedKnockoutDraw}>
+                          <NativeSelect.Field
+                            defaultValue={prediction?.penaltyWinnerTeamId ?? ""}
+                            name="penaltyWinnerTeamId"
+                          >
+                            <option value="">Selecione se o placar for empate</option>
+                            {match.homeTeam ? <option value={match.homeTeam.id}>{match.homeTeam.name}</option> : null}
+                            {match.awayTeam ? <option value={match.awayTeam.id}>{match.awayTeam.name}</option> : null}
+                          </NativeSelect.Field>
+                          <NativeSelect.Indicator />
+                        </NativeSelect.Root>
+                      </Field.Root>
+                    </Stack>
+                  ) : null}
 
-              <button className="button" disabled={match.isLocked || !participantId} type="submit">
-                {prediction ? "Atualizar palpite" : "Salvar palpite"}
-              </button>
-            </form>
-          </section>
+                  <Button colorPalette="blue" disabled={match.isLocked || !participantId} rounded="full" type="submit">
+                    {prediction ? "Atualizar palpite" : "Salvar palpite"}
+                  </Button>
+                </Stack>
+              </form>
+            </Card.Body>
+          </Card.Root>
         );
       })}
-    </div>
+    </Stack>
   );
 }

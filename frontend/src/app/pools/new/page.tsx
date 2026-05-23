@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge, Button, Card, Field, Heading, Input, SimpleGrid, Stack, Text, Textarea } from "@chakra-ui/react";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -35,45 +36,53 @@ export default function NewPoolPage() {
   }
 
   return (
-    <section className="card stack" style={{ maxWidth: 720, margin: "0 auto" }}>
-      <div>
-        <span className="pill">Novo bolão</span>
-        <h1 style={{ fontSize: "2.8rem", marginTop: 12 }}>Configure a experiência</h1>
-        <p>Defina o nome, os prêmios e compartilhe o link público com os participantes.</p>
-      </div>
+    <Card.Root as="section" maxW="3xl" mx="auto" rounded="2xl" shadow="lg">
+      <Card.Body gap={6}>
+        <Stack gap={3}>
+          <Badge alignSelf="flex-start" colorPalette="blue" rounded="full" px={3} py={1}>
+            Novo bolão
+          </Badge>
+          <Heading as="h1" fontSize={{ base: "3xl", md: "5xl" }}>
+            Configure a experiência
+          </Heading>
+          <Text color="gray.600">Defina o nome, os prêmios e compartilhe o link público com os participantes.</Text>
+        </Stack>
 
-      <form className="stack" onSubmit={onSubmit}>
-        <label>
-          Nome do bolão
-          <input name="name" required placeholder="Bolão da firma" />
-        </label>
-        <label>
-          Nome do criador
-          <input name="creatorName" required placeholder="Victor" />
-        </label>
-        <label>
-          Descrição
-          <textarea name="description" rows={4} placeholder="Regras combinadas, valor de entrada, observações..." />
-        </label>
-        <div className="grid">
-          <label>
-            Prêmio 1º lugar
-            <input name="prize1" required placeholder="R$ 500" />
-          </label>
-          <label>
-            Prêmio 2º lugar
-            <input name="prize2" required placeholder="R$ 250" />
-          </label>
-          <label>
-            Prêmio 3º lugar
-            <input name="prize3" required placeholder="R$ 100" />
-          </label>
-        </div>
-        {error ? <p className="notice">{error}</p> : null}
-        <button className="button" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Criando..." : "Criar bolão"}
-        </button>
-      </form>
-    </section>
+        <form onSubmit={onSubmit}>
+          <Stack gap={4}>
+            <Field.Root required>
+              <Field.Label>Nome do bolão</Field.Label>
+              <Input name="name" placeholder="Bolão da firma" />
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>Nome do criador</Field.Label>
+              <Input name="creatorName" placeholder="Victor" />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Descrição</Field.Label>
+              <Textarea name="description" placeholder="Regras combinadas, valor de entrada, observações..." rows={4} />
+            </Field.Root>
+            <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+              <Field.Root required>
+                <Field.Label>Prêmio 1º lugar</Field.Label>
+                <Input name="prize1" placeholder="R$ 500" />
+              </Field.Root>
+              <Field.Root required>
+                <Field.Label>Prêmio 2º lugar</Field.Label>
+                <Input name="prize2" placeholder="R$ 250" />
+              </Field.Root>
+              <Field.Root required>
+                <Field.Label>Prêmio 3º lugar</Field.Label>
+                <Input name="prize3" placeholder="R$ 100" />
+              </Field.Root>
+            </SimpleGrid>
+            {error ? <Text color="red.600">{error}</Text> : null}
+            <Button colorPalette="blue" disabled={isSubmitting} rounded="full" type="submit">
+              {isSubmitting ? "Criando..." : "Criar bolão"}
+            </Button>
+          </Stack>
+        </form>
+      </Card.Body>
+    </Card.Root>
   );
 }
