@@ -11,6 +11,7 @@ import {
   SimpleGrid,
   Stack,
   Text,
+  Separator,
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
@@ -28,7 +29,7 @@ export default function PredictionsPage({ params }: PageProps) {
   const [pool, setPool] = useState<Pool | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Record<number, Prediction>>({});
-  const [scoreDrafts, setScoreDrafts] = useState<Record<number, { homeScore: string; awayScore: string }>>({});
+  const [scoreDrafts, setScoreDrafts] = useState<Record<number, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function PredictionsPage({ params }: PageProps) {
             {
               homeScore: String(prediction.homeScore),
               awayScore: String(prediction.awayScore),
+              penaltyWinnerId: prediction.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "",
             },
           ]),
         ),
@@ -61,12 +63,13 @@ export default function PredictionsPage({ params }: PageProps) {
     });
   }, [slug]);
 
-  function updateScoreDraft(matchId: number, field: "homeScore" | "awayScore", value: string) {
+  function updateDraft(matchId: number, field: "homeScore" | "awayScore" | "penaltyWinnerId", value: string) {
     setScoreDrafts((current) => ({
       ...current,
       [matchId]: {
         homeScore: current[matchId]?.homeScore ?? "",
         awayScore: current[matchId]?.awayScore ?? "",
+        penaltyWinnerId: current[matchId]?.penaltyWinnerId ?? "",
         [field]: value,
       },
     }));
@@ -90,6 +93,14 @@ export default function PredictionsPage({ params }: PageProps) {
     });
 
     setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
+    setScoreDrafts((current) => ({
+      ...current,
+      [saved.matchId]: {
+        homeScore: String(saved.homeScore),
+        awayScore: String(saved.awayScore),
+        penaltyWinnerId: saved.penaltyWinnerTeamId ? String(saved.penaltyWinnerTeamId) : "",
+      },
+    }));
     setMessage("Palpite salvo.");
   }
 
@@ -125,14 +136,44 @@ export default function PredictionsPage({ params }: PageProps) {
         const awayScore = draft?.awayScore ?? (prediction ? String(prediction.awayScore) : "");
         const isPredictedKnockoutDraw =
           match.stage.isKnockout && homeScore !== "" && awayScore !== "" && Number(homeScore) === Number(awayScore);
+        const savedPenaltyWinnerId = prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "";
+        const isDirty =
+          prediction !== undefined &&
+          draft !== undefined &&
+          (
+            draft.homeScore !== String(prediction.homeScore) ||
+            draft.awayScore !== String(prediction.awayScore) ||
+            (isPredictedKnockoutDraw && (draft.penaltyWinnerId ?? "") !== savedPenaltyWinnerId)
+          );
 
         return (
-          <Card.Root as="section" key={match.id} rounded="2xl">
+          <Card.Root
+            as="section"
+            key={match.id}
+            rounded="2xl"
+            borderWidth={prediction || isDirty ? "2px" : "1px"}
+            borderColor={isDirty ? "orange.300" : prediction ? "green.300" : undefined}
+          >
             <Card.Body gap={4}>
               <Stack gap={2}>
-                <Badge alignSelf="flex-start" colorPalette={match.stage.isKnockout ? "purple" : "blue"} rounded="full">
-                  {match.stage.name}
-                </Badge>
+                <Stack direction="row" align="center" flexWrap="wrap" gap={2}>
+                  <Badge alignSelf="flex-start" colorPalette={match.stage.isKnockout ? "purple" : "blue"} rounded="full">
+                    {match.stage.name}
+                  </Badge>
+                  {isDirty ? (
+                    <Badge colorPalette="orange" rounded="full" variant="subtle">
+                      Alterações não salvas
+                    </Badge>
+                  ) : prediction ? (
+                    <Badge colorPalette="green" rounded="full" variant="subtle">
+                      ✓ Palpite salvo: {prediction.homeScore} x {prediction.awayScore}
+                    </Badge>
+                  ) : (
+                    <Badge colorPalette="orange" rounded="full" variant="subtle">
+                      Sem palpite
+                    </Badge>
+                  )}
+                </Stack>
                 <Heading as="h2" fontSize="2xl">
                 {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
                 </Heading>
@@ -141,6 +182,8 @@ export default function PredictionsPage({ params }: PageProps) {
                   {match.isLocked ? "bloqueado" : "aberto"}
                 </Text>
               </Stack>
+
+              <Separator />
 
               <form onSubmit={(event) => onSubmit(event, match)}>
                 <Stack gap={4}>
@@ -151,7 +194,7 @@ export default function PredictionsPage({ params }: PageProps) {
                         disabled={match.isLocked}
                         min={0}
                         name="homeScore"
-                        onChange={(event) => updateScoreDraft(match.id, "homeScore", event.target.value)}
+                        onChange={(event) => updateDraft(match.id, "homeScore", event.target.value)}
                         required
                         type="number"
                         value={homeScore}
@@ -163,7 +206,7 @@ export default function PredictionsPage({ params }: PageProps) {
                         disabled={match.isLocked}
                         min={0}
                         name="awayScore"
-                        onChange={(event) => updateScoreDraft(match.id, "awayScore", event.target.value)}
+                        onChange={(event) => updateDraft(match.id, "awayScore", event.target.value)}
                         required
                         type="number"
                         value={awayScore}
@@ -172,30 +215,36 @@ export default function PredictionsPage({ params }: PageProps) {
                   </SimpleGrid>
 
                   {match.stage.isKnockout ? (
-                    <Stack gap={3}>
-                      <Text color="gray.600">
-                        Se o palpite for empate, o jogo será considerado decidido nos pênaltis. Nesse caso, escolha o
-                        vencedor abaixo.
-                      </Text>
-                      <Field.Root required={isPredictedKnockoutDraw}>
+                    isPredictedKnockoutDraw ? (
+                      <Field.Root required>
                         <Field.Label>Vencedor nos pênaltis</Field.Label>
-                        <NativeSelect.Root disabled={match.isLocked || !isPredictedKnockoutDraw}>
+                        <NativeSelect.Root disabled={match.isLocked}>
                           <NativeSelect.Field
-                            defaultValue={prediction?.penaltyWinnerTeamId ?? ""}
                             name="penaltyWinnerTeamId"
+                            value={draft?.penaltyWinnerId ?? (prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "")}
+                            onChange={(event) => updateDraft(match.id, "penaltyWinnerId", event.target.value)}
                           >
-                            <option value="">Selecione se o placar for empate</option>
+                            <option value="">Selecione o vencedor</option>
                             {match.homeTeam ? <option value={match.homeTeam.id}>{match.homeTeam.name}</option> : null}
                             {match.awayTeam ? <option value={match.awayTeam.id}>{match.awayTeam.name}</option> : null}
                           </NativeSelect.Field>
                           <NativeSelect.Indicator />
                         </NativeSelect.Root>
                       </Field.Root>
-                    </Stack>
+                    ) : (
+                      <Text color="gray.500" fontSize="sm">
+                        Jogo de mata-mata — palpite um empate para escolher o vencedor nos pênaltis.
+                      </Text>
+                    )
                   ) : null}
 
-                  <Button colorPalette="blue" disabled={match.isLocked || !participantId} rounded="full" type="submit">
-                    {prediction ? "Atualizar palpite" : "Salvar palpite"}
+                  <Button
+                    colorPalette={isDirty ? "orange" : "blue"}
+                    disabled={match.isLocked || !participantId}
+                    rounded="full"
+                    type="submit"
+                  >
+                    {isDirty ? "Salvar alterações" : prediction ? "Atualizar palpite" : "Salvar palpite"}
                   </Button>
                 </Stack>
               </form>

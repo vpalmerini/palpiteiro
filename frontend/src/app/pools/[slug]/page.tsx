@@ -140,6 +140,12 @@ export default function PoolPage({ params }: PageProps) {
 
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>
+            {pool.description ? (
+              <>
+                <Card.Title>Descrição</Card.Title>
+                <Text color="gray.600">{pool.description}</Text>
+              </>
+            ) : null}
             <Card.Title>Prêmios</Card.Title>
             <Stack gap={3}>
               {pool.prizes.map((prize) => (
