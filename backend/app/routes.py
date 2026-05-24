@@ -861,6 +861,15 @@ def update_match(match_id):
     return jsonify(_match_payload(match))
 
 
+@api.delete("/admin/matches/<int:match_id>")
+def delete_match(match_id):
+    match = Match.query.get_or_404(match_id)
+    _assert_tournament_editable(match.tournament)
+    db.session.delete(match)
+    db.session.commit()
+    return "", 204
+
+
 # ---------------------------------------------------------------------------
 # Admin — pools per tournament
 # ---------------------------------------------------------------------------

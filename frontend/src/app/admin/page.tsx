@@ -25,6 +25,7 @@ import {
   adminCreateStage,
   adminCreateTeam,
   adminCreateTournament,
+  adminDeleteMatch,
   adminListMatches,
   adminListPools,
   adminListStages,
@@ -570,12 +571,14 @@ function MatchRow({
   teams,
   isFinished,
   onUpdated,
+  onDeleted,
 }: {
   match: Match;
   stages: Stage[];
   teams: Team[];
   isFinished: boolean;
   onUpdated: (m: Match) => void;
+  onDeleted: (matchId: number) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
@@ -676,6 +679,19 @@ function MatchRow({
             </Button>
             <Button size="xs" variant="outline" colorPalette="green" disabled={isFinished} onClick={() => { setResultOpen((v) => !v); setEditOpen(false); setError(null); }}>
               {resultOpen ? "Cancelar" : "Resultado"}
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              colorPalette="red"
+              disabled={isFinished}
+              onClick={async () => {
+                if (!confirm("Deletar este jogo? Esta ação não pode ser desfeita.")) return;
+                await adminDeleteMatch(match.id);
+                onDeleted(match.id);
+              }}
+            >
+              Deletar
             </Button>
           </HStack>
         </HStack>
@@ -807,6 +823,7 @@ function MatchesPanel({
   isFinished,
   onCreated,
   onUpdated,
+  onDeleted,
 }: {
   tournamentId: number;
   matches: Match[];
@@ -815,6 +832,7 @@ function MatchesPanel({
   isFinished: boolean;
   onCreated: (m: Match) => void;
   onUpdated: (m: Match) => void;
+  onDeleted: (matchId: number) => void;
 }) {
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<MatchDraft>({
@@ -936,7 +954,7 @@ function MatchesPanel({
       ) : (
         <Stack gap={3}>
           {sorted.map((m) => (
-            <MatchRow key={m.id} match={m} stages={stages} teams={teams} isFinished={isFinished} onUpdated={onUpdated} />
+            <MatchRow key={m.id} match={m} stages={stages} teams={teams} isFinished={isFinished} onUpdated={onUpdated} onDeleted={onDeleted} />
           ))}
         </Stack>
       )}
@@ -1244,6 +1262,7 @@ function TournamentDetail({
             isFinished={isFinished}
             onCreated={(m) => setMatches((prev) => [...prev, m])}
             onUpdated={(m) => setMatches((prev) => prev.map((x) => (x.id === m.id ? m : x)))}
+            onDeleted={(id) => setMatches((prev) => prev.filter((x) => x.id !== id))}
           />
         </Tabs.Content>
 

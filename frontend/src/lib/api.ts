@@ -146,6 +146,10 @@ export function adminCreateMatch(
   });
 }
 
+export function adminDeleteMatch(matchId: number) {
+  return request<void>(`/admin/matches/${matchId}`, { method: "DELETE" });
+}
+
 export function adminUpdateMatch(
   matchId: number,
   payload: Partial<{
