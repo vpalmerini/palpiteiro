@@ -6,7 +6,9 @@ import {
   Card,
   Field,
   Heading,
+  HStack,
   Input,
+  Separator,
   SimpleGrid,
   Stack,
   Table,
@@ -164,6 +166,94 @@ export default function PoolPage({ params }: PageProps) {
           </Card.Body>
         </Card.Root>
       </SimpleGrid>
+
+      <Card.Root as="section" rounded="2xl">
+        <Card.Body gap={5}>
+          <Card.Title>Regras do bolão</Card.Title>
+
+          <Stack gap={1}>
+            <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Pontuação dos jogos</Text>
+            <SimpleGrid columns={{ base: 2, md: 4 }} gap={3} mt={1}>
+              <Stack gap={0}>
+                <Text fontSize="xl" fontWeight="bold">{pool.scoring.exactScore} pts</Text>
+                <Text fontSize="sm" color="gray.600">Placar exato</Text>
+              </Stack>
+              <Stack gap={0}>
+                <Text fontSize="xl" fontWeight="bold">{pool.scoring.outcome} pts</Text>
+                <Text fontSize="sm" color="gray.600">Resultado correto</Text>
+              </Stack>
+              <Stack gap={0}>
+                <Text fontSize="xl" fontWeight="bold">{pool.scoring.oneTeamGoals} pt</Text>
+                <Text fontSize="sm" color="gray.600">Gols de um time</Text>
+              </Stack>
+              <Stack gap={0}>
+                <Text fontSize="xl" fontWeight="bold">{pool.scoring.penaltyBonus} pts</Text>
+                <Text fontSize="sm" color="gray.600">Acerto de pênalti</Text>
+              </Stack>
+            </SimpleGrid>
+          </Stack>
+
+          {(pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled ||
+            pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) && (
+            <>
+              <Separator />
+              <Stack gap={1}>
+                <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Palpites especiais</Text>
+                <SimpleGrid columns={{ base: 2, md: 3 }} gap={3} mt={1}>
+                  {pool.awards.champion.enabled && (
+                    <HStack gap={2}>
+                      <Badge colorPalette="yellow" variant="subtle">{pool.awards.champion.points} pts</Badge>
+                      <Text fontSize="sm">Campeão</Text>
+                    </HStack>
+                  )}
+                  {pool.awards.runnerUp.enabled && (
+                    <HStack gap={2}>
+                      <Badge colorPalette="yellow" variant="subtle">{pool.awards.runnerUp.points} pts</Badge>
+                      <Text fontSize="sm">Vice-campeão</Text>
+                    </HStack>
+                  )}
+                  {pool.awards.thirdPlace.enabled && (
+                    <HStack gap={2}>
+                      <Badge colorPalette="yellow" variant="subtle">{pool.awards.thirdPlace.points} pts</Badge>
+                      <Text fontSize="sm">3º lugar</Text>
+                    </HStack>
+                  )}
+                  {pool.awards.topScorer.enabled && (
+                    <HStack gap={2}>
+                      <Badge colorPalette="yellow" variant="subtle">{pool.awards.topScorer.points} pts</Badge>
+                      <Text fontSize="sm">Artilheiro</Text>
+                    </HStack>
+                  )}
+                  {pool.awards.bestPlayer.enabled && (
+                    <HStack gap={2}>
+                      <Badge colorPalette="yellow" variant="subtle">{pool.awards.bestPlayer.points} pts</Badge>
+                      <Text fontSize="sm">Melhor jogador</Text>
+                    </HStack>
+                  )}
+                </SimpleGrid>
+              </Stack>
+            </>
+          )}
+
+          <Separator />
+
+          <Stack gap={1}>
+            <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Critérios de desempate</Text>
+            <Stack gap={1} mt={1}>
+              {[
+                "Maior número de placares exatos",
+                "Maior número de resultados acertados",
+                "Mais pontos em jogos de mata-mata",
+              ].map((rule, i) => (
+                <HStack key={i} gap={2}>
+                  <Badge variant="outline" colorPalette="gray" fontSize="xs">{i + 1}</Badge>
+                  <Text fontSize="sm" color="gray.700">{rule}</Text>
+                </HStack>
+              ))}
+            </Stack>
+          </Stack>
+        </Card.Body>
+      </Card.Root>
 
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
