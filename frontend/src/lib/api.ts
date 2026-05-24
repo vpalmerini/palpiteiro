@@ -1,4 +1,4 @@
-import type { AdminPool, AwardPrediction, Match, Pool, Prediction, RankingEntry, Stage, Team, Tournament, TournamentStatus } from "@/types";
+import type { AdminPool, AwardPrediction, Match, MyPoolsByTournament, Pool, Prediction, RankingEntry, Stage, Team, Tournament, TournamentStatus } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5001/api";
 
@@ -169,6 +169,10 @@ export function adminUpdateMatch(
 
 export function adminListPools(tournamentId: number) {
   return request<AdminPool[]>(`/admin/tournaments/${tournamentId}/pools`);
+}
+
+export function getParticipantPools(participantId: string) {
+  return request<MyPoolsByTournament[]>(`/participants/${participantId}/pools`);
 }
 
 export function listTournaments() {

@@ -114,6 +114,9 @@ export default function NewPoolPage() {
         awards,
       });
       window.localStorage.setItem(`bolao:${pool.slug}:participantId`, pool.creatorParticipantId);
+      if (!window.localStorage.getItem("bolao:participantId")) {
+        window.localStorage.setItem("bolao:participantId", pool.creatorParticipantId);
+      }
       router.push(`/pools/${pool.slug}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível criar o bolão.");

@@ -109,6 +109,20 @@ export type Tournament = {
   };
 };
 
+export type MyPoolEntry = {
+  slug: string;
+  name: string;
+  creatorName: string;
+  participantsCount: number;
+  myPoints: number;
+  myPosition: number;
+};
+
+export type MyPoolsByTournament = {
+  tournament: { id: number; name: string; year: number; status: TournamentStatus };
+  pools: MyPoolEntry[];
+};
+
 export type Stage = {
   id: number;
   name: string;

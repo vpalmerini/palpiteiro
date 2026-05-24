@@ -438,6 +438,53 @@ def upsert_prediction(slug):
     return jsonify(_prediction_payload(prediction))
 
 
+@api.get("/participants/<public_id>/pools")
+def get_participant_pools(public_id):
+    participant = _participant_or_404(public_id)
+    memberships = PoolParticipant.query.filter_by(participant_id=participant.id).all()
+
+    by_tournament: dict = {}
+    for membership in memberships:
+        pool = membership.pool
+        t = pool.tournament
+
+        rows = (
+            db.session.query(
+                Participant.id.label("pid"),
+                func.coalesce(func.sum(ScoreEntry.points), 0).label("match_pts"),
+            )
+            .join(PoolParticipant, PoolParticipant.participant_id == Participant.id)
+            .outerjoin(Prediction, (Prediction.pool_id == pool.id) & (Prediction.participant_id == Participant.id))
+            .outerjoin(ScoreEntry, ScoreEntry.prediction_id == Prediction.id)
+            .filter(PoolParticipant.pool_id == pool.id)
+            .group_by(Participant.id)
+            .all()
+        )
+
+        totals = {row.pid: int(row.match_pts) + _calculate_award_points(pool, row.pid) for row in rows}
+        my_total = totals.get(participant.id, 0)
+        position = sum(1 for pts in totals.values() if pts > my_total) + 1
+
+        pool_entry = {
+            "slug": pool.slug,
+            "name": pool.name,
+            "creatorName": pool.creator_name,
+            "participantsCount": len(rows),
+            "myPoints": my_total,
+            "myPosition": position,
+        }
+
+        if t.id not in by_tournament:
+            by_tournament[t.id] = {
+                "tournament": {"id": t.id, "name": t.name, "year": t.year, "status": t.status},
+                "pools": [],
+            }
+        by_tournament[t.id]["pools"].append(pool_entry)
+
+    grouped = sorted(by_tournament.values(), key=lambda x: x["tournament"]["year"], reverse=True)
+    return jsonify(grouped)
+
+
 @api.get("/pools/<slug>/ranking")
 def get_ranking(slug):
     pool = _pool_or_404(slug)

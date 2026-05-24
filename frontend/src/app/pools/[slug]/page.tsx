@@ -55,13 +55,17 @@ export default function PoolPage({ params }: PageProps) {
     if (!slug) return;
 
     const form = new FormData(event.currentTarget);
+    const globalId = window.localStorage.getItem("bolao:participantId") ?? undefined;
     const result = await joinPool(slug, {
       name: String(form.get("name")),
       email: String(form.get("email")),
       nickname: String(form.get("nickname") || ""),
-      participantId: participantId ?? undefined,
+      participantId: participantId ?? globalId,
     });
     window.localStorage.setItem(`bolao:${slug}:participantId`, result.participantId);
+    if (!window.localStorage.getItem("bolao:participantId")) {
+      window.localStorage.setItem("bolao:participantId", result.participantId);
+    }
     setParticipantId(result.participantId);
     setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
     setRanking(await getRanking(slug));

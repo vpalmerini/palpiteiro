@@ -15,6 +15,9 @@ export function AppNav() {
       </Link>
       <Flex align="center" gap={2}>
         <Button asChild colorPalette="gray" variant="ghost" rounded="full" size="sm">
+          <Link href="/meus-boloes">Meus Bolões</Link>
+        </Button>
+        <Button asChild colorPalette="gray" variant="ghost" rounded="full" size="sm">
           <Link href="/admin">Admin</Link>
         </Button>
         {showCreateButton ? (
