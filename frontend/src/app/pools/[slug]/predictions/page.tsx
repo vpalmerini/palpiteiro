@@ -330,6 +330,7 @@ export default function PredictionsPage({ params }: PageProps) {
             <Separator />
 
             <form onSubmit={onAwardSubmit}>
+              <fieldset disabled={awardLocked || !participantId} style={{ border: "none", padding: 0, margin: 0 }}>
               <Stack gap={4}>
                 <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
                   {pool.awards.champion.enabled && (
@@ -410,6 +411,7 @@ export default function PredictionsPage({ params }: PageProps) {
                     : savedAwardPrediction ? "Atualizar palpites especiais" : "Salvar palpites especiais"}
                 </Button>
               </Stack>
+              </fieldset>
             </form>
           </Card.Body>
         </Card.Root>
