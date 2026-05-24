@@ -52,7 +52,7 @@ export default function MeusBoloes() {
               Você ainda não criou nem entrou em nenhum bolão neste dispositivo.
             </Text>
             <HStack gap={3}>
-              <Button asChild colorPalette="blue" rounded="full">
+              <Button asChild colorPalette="blue" rounded="full" color="white">
                 <Link href="/pools/new">Criar bolão</Link>
               </Button>
             </HStack>
@@ -78,7 +78,7 @@ export default function MeusBoloes() {
         <Card.Root rounded="2xl">
           <Card.Body gap={4}>
             <Text color="gray.600">Você ainda não participa de nenhum bolão.</Text>
-            <Button asChild colorPalette="blue" rounded="full" alignSelf="flex-start">
+            <Button asChild colorPalette="blue" rounded="full" alignSelf="flex-start" color="white">
               <Link href="/pools/new">Criar bolão</Link>
             </Button>
           </Card.Body>
@@ -91,7 +91,7 @@ export default function MeusBoloes() {
     <Stack gap={8} maxW="3xl" mx="auto">
       <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
         <Heading size="xl">Meus Bolões</Heading>
-        <Button asChild colorPalette="blue" rounded="full">
+        <Button asChild colorPalette="blue" rounded="full" color="white">
           <Link href="/pools/new">+ Criar bolão</Link>
         </Button>
       </HStack>
