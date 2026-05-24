@@ -44,10 +44,26 @@ class Tournament(db.Model):
     third_place = db.relationship("Team", foreign_keys=[third_place_team_id])
 
 
+class TeamType(str, Enum):
+    CLUB = "club"
+    NATIONAL = "national"
+
+
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     short_name = db.Column(db.String(12), nullable=False)
+    team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
+
+
+class TournamentTeam(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tournament_id = db.Column(db.Integer, db.ForeignKey("tournament.id"), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=False)
+
+    tournament = db.relationship("Tournament", backref="tournament_teams")
+    team = db.relationship("Team", backref="tournament_teams")
+    __table_args__ = (db.UniqueConstraint("tournament_id", "team_id", name="uq_tournament_team"),)
 
 
 class Stage(db.Model):

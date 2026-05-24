@@ -16,7 +16,7 @@ import {
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import { getAwardPrediction, getMatches, getPool, getPredictions, listTeams, saveAwardPrediction, savePrediction } from "@/lib/api";
+import { getAwardPrediction, getMatches, getPool, getPredictions, listTournamentTeams, saveAwardPrediction, savePrediction } from "@/lib/api";
 import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
 
 type PageProps = {
@@ -55,10 +55,10 @@ export default function PredictionsPage({ params }: PageProps) {
     void Promise.all([
       getPool(slug),
       getMatches(slug),
-      listTeams(),
       storedParticipantId ? getPredictions(slug, storedParticipantId) : Promise.resolve([]),
       storedParticipantId ? getAwardPrediction(slug, storedParticipantId) : Promise.resolve(null),
-    ]).then(([poolData, matchData, teamData, predictionData, awardData]) => {
+    ]).then(async ([poolData, matchData, predictionData, awardData]) => {
+      const teamData = await listTournamentTeams(poolData.tournamentId);
       setParticipantId(storedParticipantId);
       setPool(poolData);
       setMatches(matchData);

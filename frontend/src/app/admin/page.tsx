@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import {
+  adminAddTournamentTeam,
   adminCreateMatch,
   adminCreateStage,
   adminCreateTeam,
@@ -28,7 +29,9 @@ import {
   adminListPools,
   adminListStages,
   adminListTeams,
+  adminListTournamentTeams,
   adminListTournaments,
+  adminRemoveTournamentTeam,
   adminUpdateMatch,
   adminUpdateStage,
   adminUpdateTournamentAwards,
@@ -130,58 +133,128 @@ function TournamentSidebar({
 }
 
 // ---------------------------------------------------------------------------
-// Teams panel (global)
+// Tournament teams panel
 // ---------------------------------------------------------------------------
 
-function TeamsPanel({
-  teams,
+const TEAM_TYPE_LABELS: Record<string, string> = {
+  national: "Seleção",
+  club: "Clube",
+};
+
+const TEAM_TYPE_COLORS: Record<string, string> = {
+  national: "green",
+  club: "blue",
+};
+
+function TournamentTeamsPanel({
+  tournamentId,
+  allTeams,
+  tournamentTeams,
   isFinished,
+  onAdded,
+  onRemoved,
   onCreated,
 }: {
-  teams: Team[];
+  tournamentId: number;
+  allTeams: Team[];
+  tournamentTeams: Team[];
   isFinished: boolean;
+  onAdded: (t: Team) => void;
+  onRemoved: (teamId: number) => void;
   onCreated: (t: Team) => void;
 }) {
+  const [addTeamId, setAddTeamId] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addLoading, setAddLoading] = useState(false);
+
   const [name, setName] = useState("");
   const [shortName, setShortName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [teamType, setTeamType] = useState("national");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
+  const assignedIds = new Set(tournamentTeams.map((t) => t.id));
+  const available = allTeams.filter((t) => !assignedIds.has(t.id));
+
+  async function handleAdd() {
+    if (!addTeamId) return;
+    setAddError(null);
+    setAddLoading(true);
     try {
-      const t = await adminCreateTeam({ name: name.trim(), shortName: shortName.trim().toUpperCase() });
+      await adminAddTournamentTeam(tournamentId, Number(addTeamId));
+      const added = allTeams.find((t) => t.id === Number(addTeamId))!;
+      onAdded(added);
+      setAddTeamId("");
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Erro ao adicionar");
+    } finally {
+      setAddLoading(false);
+    }
+  }
+
+  async function handleRemove(teamId: number) {
+    try {
+      await adminRemoveTournamentTeam(tournamentId, teamId);
+      onRemoved(teamId);
+    } catch {
+      // silently ignore
+    }
+  }
+
+  async function handleCreate(event: FormEvent) {
+    event.preventDefault();
+    setCreateError(null);
+    setCreateLoading(true);
+    try {
+      const t = await adminCreateTeam({ name: name.trim(), shortName: shortName.trim().toUpperCase(), teamType });
+      onCreated(t);
+      await adminAddTournamentTeam(tournamentId, t.id);
+      onAdded(t);
       setName("");
       setShortName("");
-      onCreated(t);
+      setTeamType("national");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar time");
+      setCreateError(err instanceof Error ? err.message : "Erro ao criar time");
     } finally {
-      setSubmitting(false);
+      setCreateLoading(false);
     }
   }
 
   return (
     <Stack gap={4}>
-      <Heading size="sm">Times cadastrados</Heading>
-      {teams.length === 0 ? (
-        <Text color="gray.500" fontSize="sm">Nenhum time cadastrado.</Text>
+      <Heading size="sm">Times do torneio ({tournamentTeams.length})</Heading>
+      {tournamentTeams.length === 0 ? (
+        <Text color="gray.500" fontSize="sm">Nenhum time adicionado a este torneio ainda.</Text>
       ) : (
         <Table.Root size="sm" variant="outline" rounded="xl" overflow="hidden">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Nome</Table.ColumnHeader>
               <Table.ColumnHeader>Sigla</Table.ColumnHeader>
+              <Table.ColumnHeader>Tipo</Table.ColumnHeader>
+              <Table.ColumnHeader />
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {teams.map((t) => (
+            {tournamentTeams.map((t) => (
               <Table.Row key={t.id}>
                 <Table.Cell>{t.name}</Table.Cell>
+                <Table.Cell><Badge variant="subtle">{t.shortName}</Badge></Table.Cell>
                 <Table.Cell>
-                  <Badge variant="subtle">{t.shortName}</Badge>
+                  <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
+                    {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
+                  </Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    disabled={isFinished}
+                    onClick={() => handleRemove(t.id)}
+                  >
+                    Remover
+                  </Button>
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -190,33 +263,70 @@ function TeamsPanel({
       )}
 
       {!isFinished && (
-        <Card.Root rounded="xl">
-          <Card.Body gap={3}>
-            <Card.Title fontSize="sm">Novo time</Card.Title>
-            <form onSubmit={handleSubmit}>
-              <SimpleGrid columns={2} gap={3}>
-                <Field.Root required>
-                  <Field.Label>Nome</Field.Label>
-                  <Input size="sm" placeholder="Brasil" value={name} onChange={(e) => setName(e.target.value)} />
-                </Field.Root>
-                <Field.Root required>
-                  <Field.Label>Sigla</Field.Label>
-                  <Input
-                    size="sm"
-                    placeholder="BRA"
-                    maxLength={12}
-                    value={shortName}
-                    onChange={(e) => setShortName(e.target.value)}
-                  />
-                </Field.Root>
-              </SimpleGrid>
-              {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
-              <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting}>
-                Criar time
-              </Button>
-            </form>
-          </Card.Body>
-        </Card.Root>
+        <Stack gap={3}>
+          {available.length > 0 && (
+            <Card.Root rounded="xl">
+              <Card.Body gap={3}>
+                <Card.Title fontSize="sm">Adicionar time existente</Card.Title>
+                <HStack gap={2}>
+                  <NativeSelect.Root flex={1} size="sm" disabled={addLoading}>
+                    <NativeSelect.Field value={addTeamId} onChange={(e) => setAddTeamId(e.target.value)}>
+                      <option value="">Selecione um time…</option>
+                      {["national", "club"].map((type) => {
+                        const group = available.filter((t) => t.teamType === type);
+                        if (group.length === 0) return null;
+                        return (
+                          <optgroup key={type} label={TEAM_TYPE_LABELS[type]}>
+                            {group.map((t) => (
+                              <option key={t.id} value={t.id}>{t.name} ({t.shortName})</option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                  <Button size="sm" colorPalette="blue" loading={addLoading} disabled={!addTeamId} onClick={handleAdd}>
+                    Adicionar
+                  </Button>
+                </HStack>
+                {addError && <Text color="red.500" fontSize="sm">{addError}</Text>}
+              </Card.Body>
+            </Card.Root>
+          )}
+
+          <Card.Root rounded="xl">
+            <Card.Body gap={3}>
+              <Card.Title fontSize="sm">Criar novo time e adicionar</Card.Title>
+              <form onSubmit={handleCreate}>
+                <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
+                  <Field.Root required>
+                    <Field.Label>Nome</Field.Label>
+                    <Input size="sm" placeholder="Brasil" value={name} onChange={(e) => setName(e.target.value)} />
+                  </Field.Root>
+                  <Field.Root required>
+                    <Field.Label>Sigla</Field.Label>
+                    <Input size="sm" placeholder="BRA" maxLength={12} value={shortName} onChange={(e) => setShortName(e.target.value)} />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Tipo</Field.Label>
+                    <NativeSelect.Root size="sm">
+                      <NativeSelect.Field value={teamType} onChange={(e) => setTeamType(e.target.value)}>
+                        <option value="national">Seleção</option>
+                        <option value="club">Clube</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+                </SimpleGrid>
+                {createError && <Text color="red.500" fontSize="sm" mt={2}>{createError}</Text>}
+                <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={createLoading}>
+                  Criar e adicionar
+                </Button>
+              </form>
+            </Card.Body>
+          </Card.Root>
+        </Stack>
       )}
     </Stack>
   );
@@ -1043,6 +1153,7 @@ function TournamentDetail({
   const [stages, setStages] = useState<Stage[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [pools, setPools] = useState<AdminPool[]>([]);
+  const [tournamentTeams, setTournamentTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1051,10 +1162,12 @@ function TournamentDetail({
       adminListStages(tournament.id),
       adminListMatches(tournament.id),
       adminListPools(tournament.id),
-    ]).then(([s, m, p]) => {
+      adminListTournamentTeams(tournament.id),
+    ]).then(([s, m, p, tt]) => {
       setStages(s);
       setMatches(m);
       setPools(p);
+      setTournamentTeams(tt);
       setLoading(false);
     });
   }, [tournament.id]);
@@ -1097,7 +1210,7 @@ function TournamentDetail({
             tournamentId={tournament.id}
             matches={matches}
             stages={stages}
-            teams={teams}
+            teams={tournamentTeams}
             isFinished={isFinished}
             onCreated={(m) => setMatches((prev) => [...prev, m])}
             onUpdated={(m) => setMatches((prev) => prev.map((x) => (x.id === m.id ? m : x)))}
@@ -1119,11 +1232,19 @@ function TournamentDetail({
         </Tabs.Content>
 
         <Tabs.Content value="premiacoes" pt={4}>
-          <AwardsPanel tournament={tournament} teams={teams} isFinished={isFinished} onUpdated={setTournament} />
+          <AwardsPanel tournament={tournament} teams={tournamentTeams} isFinished={isFinished} onUpdated={setTournament} />
         </Tabs.Content>
 
         <Tabs.Content value="times" pt={4}>
-          <TeamsPanel teams={teams} isFinished={isFinished} onCreated={onTeamCreated} />
+          <TournamentTeamsPanel
+            tournamentId={tournament.id}
+            allTeams={teams}
+            tournamentTeams={tournamentTeams}
+            isFinished={isFinished}
+            onAdded={(t) => setTournamentTeams((prev) => [...prev, t])}
+            onRemoved={(id) => setTournamentTeams((prev) => prev.filter((t) => t.id !== id))}
+            onCreated={onTeamCreated}
+          />
         </Tabs.Content>
       </Tabs.Root>
     </Stack>

@@ -127,12 +127,6 @@ export function adminListTeams() {
   return request<Team[]>("/admin/teams");
 }
 
-export function adminCreateTeam(payload: { name: string; shortName: string }) {
-  return request<Team>("/admin/teams", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
 
 export function adminListMatches(tournamentId: number) {
   return request<Match[]>(`/admin/tournaments/${tournamentId}/matches`);
@@ -173,6 +167,34 @@ export function adminListPools(tournamentId: number) {
 
 export function getParticipantPools(participantId: string) {
   return request<MyPoolsByTournament[]>(`/participants/${participantId}/pools`);
+}
+
+export function listTournamentTeams(tournamentId: number) {
+  return request<Team[]>(`/tournaments/${tournamentId}/teams`);
+}
+
+export function adminListTournamentTeams(tournamentId: number) {
+  return request<Team[]>(`/admin/tournaments/${tournamentId}/teams`);
+}
+
+export function adminAddTournamentTeam(tournamentId: number, teamId: number) {
+  return request<{ tournamentId: number; teamId: number }>(`/admin/tournaments/${tournamentId}/teams`, {
+    method: "POST",
+    body: JSON.stringify({ teamId }),
+  });
+}
+
+export function adminRemoveTournamentTeam(tournamentId: number, teamId: number) {
+  return request<void>(`/admin/tournaments/${tournamentId}/teams/${teamId}`, {
+    method: "DELETE",
+  });
+}
+
+export function adminCreateTeam(payload: { name: string; shortName: string; teamType: string }) {
+  return request<Team>("/admin/teams", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listTournaments() {

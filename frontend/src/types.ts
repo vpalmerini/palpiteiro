@@ -14,6 +14,7 @@ export type Pool = {
   name: string;
   description: string | null;
   creatorName: string;
+  tournamentId: number;
   awardsLocked: boolean;
   scoring: {
     exactScore: number;
@@ -41,10 +42,13 @@ export type AwardPrediction = {
   updatedAt: string;
 };
 
+export type TeamType = "club" | "national";
+
 export type Team = {
   id: number;
   name: string;
   shortName: string;
+  teamType: TeamType;
 };
 
 export type Match = {

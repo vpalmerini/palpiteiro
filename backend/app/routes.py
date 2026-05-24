@@ -19,8 +19,10 @@ from .models import (
     ScoreEntry,
     Stage,
     Team,
+    TeamType,
     Tournament,
     TournamentStatus,
+    TournamentTeam,
 )
 from .scoring import calculate_prediction_score
 
@@ -69,7 +71,7 @@ def _participant_or_404(public_id: str) -> Participant:
 def _team_payload(team: Team | None):
     if team is None:
         return None
-    return {"id": team.id, "name": team.name, "shortName": team.short_name}
+    return {"id": team.id, "name": team.name, "shortName": team.short_name, "teamType": team.team_type}
 
 
 def _match_payload(match: Match):
@@ -100,6 +102,7 @@ def _pool_payload(pool: Pool):
         "name": pool.name,
         "description": pool.description,
         "creatorName": pool.creator_name,
+        "tournamentId": pool.tournament_id,
         "scoring": {
             "exactScore": pool.exact_score_points,
             "outcome": pool.outcome_points,
@@ -648,7 +651,7 @@ def _stage_payload(stage: Stage):
 
 
 def _team_full_payload(team: Team):
-    return {"id": team.id, "name": team.name, "shortName": team.short_name}
+    return {"id": team.id, "name": team.name, "shortName": team.short_name, "teamType": team.team_type}
 
 
 @api.get("/admin/tournaments")
@@ -740,12 +743,47 @@ def create_team():
     data = _json()
     name = (data.get("name") or "").strip()
     short_name = (data.get("shortName") or "").strip()
+    team_type = (data.get("teamType") or TeamType.NATIONAL.value).strip()
     if not name or not short_name:
         abort(400, description="name and shortName are required")
-    team = Team(name=name, short_name=short_name)
+    if team_type not in [t.value for t in TeamType]:
+        abort(400, description="teamType must be 'club' or 'national'")
+    team = Team(name=name, short_name=short_name, team_type=team_type)
     db.session.add(team)
     db.session.commit()
     return jsonify(_team_full_payload(team)), 201
+
+
+@api.get("/admin/tournaments/<int:tournament_id>/teams")
+def list_tournament_teams(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    entries = TournamentTeam.query.filter_by(tournament_id=tournament_id).all()
+    return jsonify([_team_full_payload(e.team) for e in entries])
+
+
+@api.post("/admin/tournaments/<int:tournament_id>/teams")
+def add_tournament_team(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    data = _json()
+    team_id = data.get("teamId")
+    if not team_id:
+        abort(400, description="teamId is required")
+    Team.query.get_or_404(team_id)
+    existing = TournamentTeam.query.filter_by(tournament_id=tournament_id, team_id=team_id).first()
+    if existing:
+        abort(409, description="team already in tournament")
+    entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id)
+    db.session.add(entry)
+    db.session.commit()
+    return jsonify({"tournamentId": tournament_id, "teamId": team_id}), 201
+
+
+@api.delete("/admin/tournaments/<int:tournament_id>/teams/<int:team_id>")
+def remove_tournament_team(tournament_id, team_id):
+    entry = TournamentTeam.query.filter_by(tournament_id=tournament_id, team_id=team_id).first_or_404()
+    db.session.delete(entry)
+    db.session.commit()
+    return "", 204
 
 
 # ---------------------------------------------------------------------------
@@ -840,6 +878,18 @@ def list_tournaments_public():
 def list_teams_public():
     teams = Team.query.order_by(Team.name).all()
     return jsonify([_team_full_payload(t) for t in teams])
+
+
+@api.get("/tournaments/<int:tournament_id>/teams")
+def list_tournament_teams_public(tournament_id):
+    Tournament.query.get_or_404(tournament_id)
+    entries = (
+        TournamentTeam.query.filter_by(tournament_id=tournament_id)
+        .join(Team)
+        .order_by(Team.name)
+        .all()
+    )
+    return jsonify([_team_full_payload(e.team) for e in entries])
 
 
 @api.get("/pools/<slug>/award-prediction")
