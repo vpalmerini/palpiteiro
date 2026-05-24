@@ -21,6 +21,27 @@ import { useRouter } from "next/navigation";
 
 import { createPool, listTournaments, type AwardConfigPayload } from "@/lib/api";
 
+type ScoringState = {
+  exactScore: number;
+  outcome: number;
+  oneTeamGoals: number;
+  penaltyBonus: number;
+};
+
+const DEFAULT_SCORING: ScoringState = {
+  exactScore: 5,
+  outcome: 3,
+  oneTeamGoals: 1,
+  penaltyBonus: 2,
+};
+
+const SCORING_LABELS: Record<keyof ScoringState, { label: string; helper: string }> = {
+  exactScore:   { label: "Placar exato",         helper: "Acertou o placar certinho" },
+  outcome:      { label: "Resultado",             helper: "Acertou vitória, empate ou derrota" },
+  oneTeamGoals: { label: "Gols de um time",       helper: "Acertou os gols de pelo menos um dos times" },
+  penaltyBonus: { label: "Bônus pênaltis",        helper: "Acertou o vencedor nos pênaltis (mata-mata)" },
+};
+
 type AwardsState = {
   champion: AwardConfigPayload;
   runnerUp: AwardConfigPayload;
@@ -49,6 +70,7 @@ export default function NewPoolPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scoring, setScoring] = useState<ScoringState>(DEFAULT_SCORING);
   const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
   const [tournaments, setTournaments] = useState<{ id: number; name: string; year: number; status: string }[]>([]);
   const [tournamentId, setTournamentId] = useState<number | null>(null);
@@ -88,6 +110,7 @@ export default function NewPoolPage() {
           position,
           description: String(form.get(`prize${position}`)),
         })),
+        scoring,
         awards,
       });
       window.localStorage.setItem(`bolao:${pool.slug}:participantId`, pool.creatorParticipantId);
@@ -171,6 +194,34 @@ export default function NewPoolPage() {
                 <Input name="prize3" placeholder="R$ 100" />
               </Field.Root>
             </SimpleGrid>
+
+            <Separator />
+
+            <Stack gap={3}>
+              <Heading size="sm">Pontuação dos jogos</Heading>
+              <Text color="gray.600" fontSize="sm">
+                Defina quantos pontos cada tipo de acerto vale nos resultados de cada jogo.
+              </Text>
+              {(Object.keys(DEFAULT_SCORING) as (keyof ScoringState)[]).map((key) => (
+                <HStack key={key} gap={4} align="center">
+                  <Stack flex="1" gap={0}>
+                    <Text fontSize="sm" fontWeight="medium">{SCORING_LABELS[key].label}</Text>
+                    <Text fontSize="xs" color="gray.500">{SCORING_LABELS[key].helper}</Text>
+                  </Stack>
+                  <HStack gap={2} align="center">
+                    <Input
+                      type="number"
+                      min={0}
+                      w="20"
+                      size="sm"
+                      value={scoring[key]}
+                      onChange={(e) => setScoring((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                    />
+                    <Text fontSize="sm" color="gray.500" whiteSpace="nowrap">pts</Text>
+                  </HStack>
+                </HStack>
+              ))}
+            </Stack>
 
             <Separator />
 

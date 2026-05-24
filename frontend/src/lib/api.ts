@@ -30,6 +30,7 @@ export function createPool(payload: {
   creatorEmail: string;
   creatorNickname: string;
   prizes: { position: number; description: string }[];
+  scoring: { exactScore: number; outcome: number; oneTeamGoals: number; penaltyBonus: number };
   awards: {
     champion: AwardConfigPayload;
     runnerUp: AwardConfigPayload;
