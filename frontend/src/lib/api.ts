@@ -109,7 +109,7 @@ export function adminListStages(tournamentId: number) {
 
 export function adminCreateStage(
   tournamentId: number,
-  payload: { name: string; order: number; isKnockout: boolean },
+  payload: { name: string; order: number; stageType: string },
 ) {
   return request<Stage>(`/admin/tournaments/${tournamentId}/stages`, {
     method: "POST",
@@ -119,7 +119,7 @@ export function adminCreateStage(
 
 export function adminUpdateStage(
   stageId: number,
-  payload: Partial<{ name: string; order: number; isKnockout: boolean }>,
+  payload: Partial<{ name: string; order: number; stageType: string }>,
 ) {
   return request<Stage>(`/admin/stages/${stageId}`, {
     method: "PATCH",

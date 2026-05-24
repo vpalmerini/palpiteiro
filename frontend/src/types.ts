@@ -56,6 +56,7 @@ export type Match = {
   stage: {
     id: number;
     name: string;
+    stageType: StageType;
     isKnockout: boolean;
   };
   homeTeam: Team | null;
@@ -127,10 +128,13 @@ export type MyPoolsByTournament = {
   pools: MyPoolEntry[];
 };
 
+export type StageType = "group" | "league" | "knockout";
+
 export type Stage = {
   id: number;
   name: string;
   order: number;
+  stageType: StageType;
   isKnockout: boolean;
 };
 

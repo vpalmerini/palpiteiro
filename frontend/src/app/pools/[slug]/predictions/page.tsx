@@ -318,7 +318,7 @@ export default function PredictionsPage({ params }: PageProps) {
             <Card.Body gap={4}>
               <Stack gap={2}>
                 <Stack direction="row" align="center" flexWrap="wrap" gap={2}>
-                  <Badge alignSelf="flex-start" colorPalette={match.stage.isKnockout ? "purple" : "blue"} rounded="full">
+                  <Badge alignSelf="flex-start" colorPalette={match.stage.stageType === "knockout" ? "purple" : "blue"} rounded="full">
                     {match.stage.name}
                   </Badge>
                   {isDirty ? (

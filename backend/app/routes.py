@@ -18,6 +18,7 @@ from .models import (
     Prediction,
     ScoreEntry,
     Stage,
+    StageType,
     Team,
     TeamType,
     Tournament,
@@ -80,6 +81,7 @@ def _match_payload(match: Match):
         "stage": {
             "id": match.stage.id,
             "name": match.stage.name,
+            "stageType": match.stage.stage_type,
             "isKnockout": match.stage.is_knockout,
         },
         "homeTeam": _team_payload(match.home_team),
@@ -205,8 +207,8 @@ def seed_database() -> str:
     db.session.add_all(teams)
     db.session.flush()
 
-    group_stage = Stage(tournament_id=tournament.id, name="Fase de grupos", order=1, is_knockout=False)
-    round_16 = Stage(tournament_id=tournament.id, name="Oitavas", order=2, is_knockout=True)
+    group_stage = Stage(tournament_id=tournament.id, name="Fase de grupos", order=1, stage_type=StageType.GROUP.value)
+    round_16 = Stage(tournament_id=tournament.id, name="Oitavas", order=2, stage_type=StageType.KNOCKOUT.value)
     db.session.add_all([group_stage, round_16])
     db.session.flush()
 
@@ -504,7 +506,7 @@ def get_ranking(slug):
             func.coalesce(func.sum(func.cast(ScoreEntry.exact_score, db.Integer)), 0).label("exact_scores"),
             func.coalesce(func.sum(func.cast(ScoreEntry.outcome_hit, db.Integer)), 0).label("outcome_hits"),
             func.coalesce(
-                func.sum(db.case((Stage.is_knockout.is_(True), ScoreEntry.points), else_=0)), 0
+                func.sum(db.case((Stage.stage_type == StageType.KNOCKOUT.value, ScoreEntry.points), else_=0)), 0
             ).label("knockout_points"),
         )
         .join(Participant, PoolParticipant.participant_id == Participant.id)
@@ -646,6 +648,7 @@ def _stage_payload(stage: Stage):
         "id": stage.id,
         "name": stage.name,
         "order": stage.order,
+        "stageType": stage.stage_type,
         "isKnockout": stage.is_knockout,
     }
 
@@ -706,7 +709,7 @@ def create_stage(tournament_id):
         tournament_id=tournament_id,
         name=name,
         order=int(order),
-        is_knockout=bool(data.get("isKnockout", False)),
+        stage_type=(data.get("stageType") or StageType.GROUP.value),
     )
     db.session.add(stage)
     db.session.commit()
@@ -722,8 +725,8 @@ def update_stage(stage_id):
         stage.name = (data["name"] or "").strip() or stage.name
     if "order" in data:
         stage.order = int(data["order"])
-    if "isKnockout" in data:
-        stage.is_knockout = bool(data["isKnockout"])
+    if "stageType" in data and data["stageType"] in [t.value for t in StageType]:
+        stage.stage_type = data["stageType"]
     db.session.commit()
     return jsonify(_stage_payload(stage))
 

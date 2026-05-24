@@ -66,14 +66,24 @@ class TournamentTeam(db.Model):
     __table_args__ = (db.UniqueConstraint("tournament_id", "team_id", name="uq_tournament_team"),)
 
 
+class StageType(str, Enum):
+    GROUP = "group"
+    LEAGUE = "league"
+    KNOCKOUT = "knockout"
+
+
 class Stage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tournament_id = db.Column(db.Integer, db.ForeignKey("tournament.id"), nullable=False)
     name = db.Column(db.String(80), nullable=False)
     order = db.Column(db.Integer, nullable=False)
-    is_knockout = db.Column(db.Boolean, nullable=False, default=False)
+    stage_type = db.Column(db.String(16), nullable=False, default=StageType.GROUP.value)
 
     tournament = db.relationship("Tournament", backref="stages")
+
+    @property
+    def is_knockout(self) -> bool:
+        return self.stage_type == StageType.KNOCKOUT.value
 
 
 class Pool(db.Model):

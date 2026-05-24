@@ -367,6 +367,18 @@ function TournamentTeamsPanel({
 // Stages panel
 // ---------------------------------------------------------------------------
 
+const STAGE_TYPE_LABELS: Record<string, string> = {
+  group: "Fase de grupos",
+  league: "Pontos corridos",
+  knockout: "Mata-mata",
+};
+
+const STAGE_TYPE_COLORS: Record<string, string> = {
+  group: "blue",
+  league: "teal",
+  knockout: "purple",
+};
+
 function StagesPanel({
   tournamentId,
   stages,
@@ -382,13 +394,13 @@ function StagesPanel({
 }) {
   const [name, setName] = useState("");
   const [order, setOrder] = useState(String(stages.length + 1));
-  const [isKnockout, setIsKnockout] = useState(false);
+  const [stageType, setStageType] = useState("group");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editOrder, setEditOrder] = useState("");
-  const [editIsKnockout, setEditIsKnockout] = useState(false);
+  const [editStageType, setEditStageType] = useState("group");
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
@@ -398,11 +410,11 @@ function StagesPanel({
       const s = await adminCreateStage(tournamentId, {
         name: name.trim(),
         order: Number(order),
-        isKnockout,
+        stageType,
       });
       setName("");
       setOrder(String(stages.length + 2));
-      setIsKnockout(false);
+      setStageType("group");
       onCreated(s);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar fase");
@@ -415,7 +427,7 @@ function StagesPanel({
     setEditingId(stage.id);
     setEditName(stage.name);
     setEditOrder(String(stage.order));
-    setEditIsKnockout(stage.isKnockout);
+    setEditStageType(stage.stageType);
   }
 
   async function saveEdit(stageId: number) {
@@ -423,7 +435,7 @@ function StagesPanel({
       const s = await adminUpdateStage(stageId, {
         name: editName.trim(),
         order: Number(editOrder),
-        isKnockout: editIsKnockout,
+        stageType: editStageType,
       });
       setEditingId(null);
       onUpdated(s);
@@ -466,15 +478,14 @@ function StagesPanel({
                     <Input size="xs" value={editName} onChange={(e) => setEditName(e.target.value)} />
                   </Table.Cell>
                   <Table.Cell>
-                    <Checkbox.Root
-                      checked={editIsKnockout}
-                      onCheckedChange={(d) => setEditIsKnockout(Boolean(d.checked))}
-                      size="sm"
-                    >
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control />
-                      <Checkbox.Label>Mata-mata</Checkbox.Label>
-                    </Checkbox.Root>
+                    <NativeSelect.Root size="xs" w="36">
+                      <NativeSelect.Field value={editStageType} onChange={(e) => setEditStageType(e.target.value)}>
+                        {Object.entries(STAGE_TYPE_LABELS).map(([v, l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
                   </Table.Cell>
                   <Table.Cell>
                     <HStack gap={1}>
@@ -488,8 +499,8 @@ function StagesPanel({
                   <Table.Cell>{stage.order}</Table.Cell>
                   <Table.Cell>{stage.name}</Table.Cell>
                   <Table.Cell>
-                    <Badge colorPalette={stage.isKnockout ? "purple" : "blue"} variant="subtle">
-                      {stage.isKnockout ? "Mata-mata" : "Grupos"}
+                    <Badge colorPalette={STAGE_TYPE_COLORS[stage.stageType] ?? "gray"} variant="subtle">
+                      {STAGE_TYPE_LABELS[stage.stageType] ?? stage.stageType}
                     </Badge>
                   </Table.Cell>
                   <Table.Cell>
@@ -518,16 +529,14 @@ function StagesPanel({
                 </Field.Root>
                 <Field.Root>
                   <Field.Label>Tipo</Field.Label>
-                  <Checkbox.Root
-                    checked={isKnockout}
-                    onCheckedChange={(d) => setIsKnockout(Boolean(d.checked))}
-                    size="sm"
-                    mt={1}
-                  >
-                    <Checkbox.HiddenInput />
-                    <Checkbox.Control />
-                    <Checkbox.Label>Mata-mata</Checkbox.Label>
-                  </Checkbox.Root>
+                  <NativeSelect.Root size="sm">
+                    <NativeSelect.Field value={stageType} onChange={(e) => setStageType(e.target.value)}>
+                      {Object.entries(STAGE_TYPE_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
                 </Field.Root>
               </SimpleGrid>
               {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
@@ -654,7 +663,7 @@ function MatchRow({
         <HStack justify="space-between" flexWrap="wrap" gap={2}>
           <Stack gap={1}>
             <HStack gap={2} flexWrap="wrap">
-              <Badge colorPalette={match.stage.isKnockout ? "purple" : "blue"} variant="subtle" rounded="full">
+              <Badge colorPalette={STAGE_TYPE_COLORS[match.stage.stageType] ?? "gray"} variant="subtle" rounded="full">
                 {match.stage.name}
               </Badge>
               <Badge colorPalette={statusColor} variant="subtle" rounded="full">
