@@ -52,7 +52,7 @@ class TeamType(str, Enum):
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    short_name = db.Column(db.String(12), nullable=False)
+    short_name = db.Column(db.String(12), nullable=True)
     team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
 
 

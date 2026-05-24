@@ -304,8 +304,8 @@ function TournamentTeamsPanel({
                     <Field.Label>Nome</Field.Label>
                     <Input size="sm" placeholder="Brasil" value={name} onChange={(e) => setName(e.target.value)} />
                   </Field.Root>
-                  <Field.Root required>
-                    <Field.Label>Sigla</Field.Label>
+                  <Field.Root>
+                    <Field.Label>Sigla <Text as="span" color="gray.400" fontWeight="normal">(opcional)</Text></Field.Label>
                     <Input size="sm" placeholder="BRA" maxLength={12} value={shortName} onChange={(e) => setShortName(e.target.value)} />
                   </Field.Root>
                   <Field.Root>

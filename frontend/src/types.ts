@@ -47,7 +47,7 @@ export type TeamType = "club" | "national";
 export type Team = {
   id: number;
   name: string;
-  shortName: string;
+  shortName: string | null;
   teamType: TeamType;
 };
 

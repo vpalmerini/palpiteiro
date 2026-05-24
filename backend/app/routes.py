@@ -742,10 +742,10 @@ def list_teams():
 def create_team():
     data = _json()
     name = (data.get("name") or "").strip()
-    short_name = (data.get("shortName") or "").strip()
+    short_name = (data.get("shortName") or "").strip() or None
     team_type = (data.get("teamType") or TeamType.NATIONAL.value).strip()
-    if not name or not short_name:
-        abort(400, description="name and shortName are required")
+    if not name:
+        abort(400, description="name is required")
     if team_type not in [t.value for t in TeamType]:
         abort(400, description="teamType must be 'club' or 'national'")
     team = Team(name=name, short_name=short_name, team_type=team_type)
