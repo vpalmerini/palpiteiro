@@ -14,7 +14,7 @@ export type Pool = {
   name: string;
   description: string | null;
   creatorName: string;
-  tournamentStatus: TournamentStatus;
+  awardsLocked: boolean;
   scoring: {
     exactScore: number;
     outcome: number;
@@ -86,7 +86,7 @@ export type RankingEntry = {
   awardPoints: number;
 };
 
-export type TournamentStatus = "not_started" | "ongoing" | "finished";
+export type TournamentStatus = "ongoing" | "finished";
 
 export type Tournament = {
   id: number;

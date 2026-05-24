@@ -24,7 +24,6 @@ class Participant(db.Model):
 
 
 class TournamentStatus(str, Enum):
-    NOT_STARTED = "not_started"
     ONGOING = "ongoing"
     FINISHED = "finished"
 
@@ -33,7 +32,7 @@ class Tournament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False)
     year = db.Column(db.Integer, nullable=False)
-    status = db.Column(db.String(24), nullable=False, default=TournamentStatus.NOT_STARTED.value)
+    status = db.Column(db.String(24), nullable=False, default=TournamentStatus.ONGOING.value)
     champion_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
     runner_up_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
     third_place_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)

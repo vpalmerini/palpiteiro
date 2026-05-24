@@ -44,6 +44,20 @@ def _as_aware_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _awards_locked(pool: Pool) -> bool:
+    """Lock award predictions once the first match has started or tournament finished."""
+    if pool.tournament.status == TournamentStatus.FINISHED.value:
+        return True
+    first_match = (
+        Match.query.filter_by(tournament_id=pool.tournament_id)
+        .order_by(Match.starts_at.asc())
+        .first()
+    )
+    if first_match is None:
+        return False
+    return datetime.now(timezone.utc) >= _as_aware_utc(first_match.starts_at)
+
+
 def _pool_or_404(slug: str) -> Pool:
     return Pool.query.filter_by(slug=slug).first_or_404()
 
@@ -96,7 +110,7 @@ def _pool_payload(pool: Pool):
             {"position": prize.position, "description": prize.description}
             for prize in prizes
         ],
-        "tournamentStatus": pool.tournament.status,
+        "awardsLocked": _awards_locked(pool),
         "awards": {
             "champion": {"enabled": pool.predict_champion, "points": pool.champion_points},
             "runnerUp": {"enabled": pool.predict_runner_up, "points": pool.runner_up_points},
@@ -778,10 +792,8 @@ def get_award_prediction(slug):
         abort(400, description="participantId is required")
     participant = _participant_or_404(participant_id)
     award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
-    is_locked = pool.tournament.status != TournamentStatus.NOT_STARTED.value
     return jsonify({
-        "isLocked": is_locked,
-        "tournamentStatus": pool.tournament.status,
+        "isLocked": _awards_locked(pool),
         "prediction": _award_prediction_payload(award_pred) if award_pred else None,
     })
 
@@ -794,7 +806,7 @@ def upsert_award_prediction(slug):
     membership = PoolParticipant.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
     if membership is None:
         abort(403, description="participant has not joined this pool")
-    if pool.tournament.status != TournamentStatus.NOT_STARTED.value:
+    if _awards_locked(pool):
         abort(409, description="award predictions are locked")
     award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant.id).first()
     if award_pred is None:

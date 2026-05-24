@@ -42,7 +42,6 @@ export default function PredictionsPage({ params }: PageProps) {
   const [savedAwardPrediction, setSavedAwardPrediction] = useState<AwardPrediction | null>(null);
   const [awardDraft, setAwardDraft] = useState<AwardDraft>({ championTeamId: "", runnerUpTeamId: "", thirdPlaceTeamId: "", topScorer: "", bestPlayer: "" });
   const [awardLocked, setAwardLocked] = useState(false);
-  const [tournamentStatus, setTournamentStatus] = useState<string>("not_started");
   const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -64,9 +63,7 @@ export default function PredictionsPage({ params }: PageProps) {
       setPool(poolData);
       setMatches(matchData);
       setTeams(teamData);
-      const locked = poolData.tournamentStatus !== "not_started";
-      setAwardLocked(locked);
-      setTournamentStatus(poolData.tournamentStatus);
+      setAwardLocked(poolData.awardsLocked);
       setPredictions(Object.fromEntries(predictionData.map((prediction) => [prediction.matchId, prediction])));
       setScoreDrafts(
         Object.fromEntries(
@@ -322,8 +319,8 @@ export default function PredictionsPage({ params }: PageProps) {
               </Stack>
               <Text color="gray.600" fontSize="sm">
                 {awardLocked
-                  ? tournamentStatus === "finished" ? "O torneio foi encerrado." : "O torneio já começou — palpites especiais bloqueados."
-                  : "Disponíveis até o início do torneio. Cada acerto vale pontos extras no ranking."}
+                  ? "O torneio já começou — palpites especiais bloqueados."
+                  : "Disponíveis até o início do primeiro jogo. Cada acerto vale pontos extras no ranking."}
               </Text>
             </Stack>
 
@@ -407,7 +404,7 @@ export default function PredictionsPage({ params }: PageProps) {
                   alignSelf="flex-start"
                 >
                   {awardLocked
-                    ? tournamentStatus === "finished" ? "Torneio encerrado" : "Torneio iniciado — palpites bloqueados"
+                    ? "Torneio iniciado — palpites bloqueados"
                     : savedAwardPrediction ? "Atualizar palpites especiais" : "Salvar palpites especiais"}
                 </Button>
               </Stack>
