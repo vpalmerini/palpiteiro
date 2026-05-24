@@ -83,6 +83,7 @@ export type RankingEntry = {
   points: number;
   exactScores: number;
   outcomeHits: number;
+  knockoutPoints: number;
   awardPoints: number;
 };
 

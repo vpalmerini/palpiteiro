@@ -453,10 +453,15 @@ def get_ranking(slug):
             func.coalesce(func.sum(ScoreEntry.points), 0).label("match_points"),
             func.coalesce(func.sum(func.cast(ScoreEntry.exact_score, db.Integer)), 0).label("exact_scores"),
             func.coalesce(func.sum(func.cast(ScoreEntry.outcome_hit, db.Integer)), 0).label("outcome_hits"),
+            func.coalesce(
+                func.sum(db.case((Stage.is_knockout.is_(True), ScoreEntry.points), else_=0)), 0
+            ).label("knockout_points"),
         )
         .join(Participant, PoolParticipant.participant_id == Participant.id)
         .outerjoin(Prediction, (Prediction.pool_id == pool.id) & (Prediction.participant_id == Participant.id))
         .outerjoin(ScoreEntry, ScoreEntry.prediction_id == Prediction.id)
+        .outerjoin(Match, Match.id == Prediction.match_id)
+        .outerjoin(Stage, Stage.id == Match.stage_id)
         .filter(PoolParticipant.pool_id == pool.id)
         .group_by(PoolParticipant.display_name, Participant.public_id, Participant.id, PoolParticipant.joined_at)
         .all()
@@ -471,10 +476,16 @@ def get_ranking(slug):
             "points": int(row.match_points) + award_pts,
             "exactScores": int(row.exact_scores),
             "outcomeHits": int(row.outcome_hits),
+            "knockoutPoints": int(row.knockout_points),
             "awardPoints": award_pts,
         })
 
-    entries.sort(key=lambda e: (-e["points"], -e["exactScores"], -e["outcomeHits"]))
+    entries.sort(key=lambda e: (
+        -e["points"],
+        -e["exactScores"],
+        -e["outcomeHits"],
+        -e["knockoutPoints"],
+    ))
 
     return jsonify(
         [

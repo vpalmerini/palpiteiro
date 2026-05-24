@@ -168,10 +168,12 @@ export default function PoolPage({ params }: PageProps) {
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.ColumnHeader>Posição</Table.ColumnHeader>
+                  <Table.ColumnHeader w="12">Pos.</Table.ColumnHeader>
                   <Table.ColumnHeader>Participante</Table.ColumnHeader>
-                  <Table.ColumnHeader>Pontos</Table.ColumnHeader>
-                  <Table.ColumnHeader>Placares exatos</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="center">Pontos</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="center" title="Critério de desempate 1">Placares exatos</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="center" title="Critério de desempate 2">Resultados</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="center" title="Critério de desempate 3">Pts. mata-mata</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -179,8 +181,10 @@ export default function PoolPage({ params }: PageProps) {
                   <Table.Row key={entry.participantId}>
                     <Table.Cell>{entry.position}</Table.Cell>
                     <Table.Cell>{entry.displayName}</Table.Cell>
-                    <Table.Cell>{entry.points}</Table.Cell>
-                    <Table.Cell>{entry.exactScores}</Table.Cell>
+                    <Table.Cell textAlign="center" fontWeight="semibold">{entry.points}</Table.Cell>
+                    <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
+                    <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
+                    <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
                   </Table.Row>
                 ))}
               </Table.Body>
