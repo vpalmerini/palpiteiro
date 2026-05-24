@@ -17,11 +17,13 @@ import { getParticipantPools } from "@/lib/api";
 import type { MyPoolsByTournament } from "@/types";
 
 const STATUS_LABELS: Record<string, string> = {
+  not_started: "Não iniciado",
   ongoing: "Em andamento",
   finished: "Encerrado",
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  not_started: "gray",
   ongoing: "green",
   finished: "blue",
 };

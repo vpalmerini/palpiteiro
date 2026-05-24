@@ -847,12 +847,14 @@ function PoolsPanel({ pools }: { pools: AdminPool[] }) {
 // Tournament status control
 // ---------------------------------------------------------------------------
 
-const STATUS_LABELS: Record<TournamentStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
+  not_started: "Não iniciado",
   ongoing: "Em andamento",
   finished: "Encerrado",
 };
 
-const STATUS_COLORS: Record<TournamentStatus, string> = {
+const STATUS_COLORS: Record<string, string> = {
+  not_started: "gray",
   ongoing: "green",
   finished: "blue",
 };
