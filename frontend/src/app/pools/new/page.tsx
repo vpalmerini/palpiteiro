@@ -9,16 +9,17 @@ import {
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Separator,
   SimpleGrid,
   Stack,
   Text,
   Textarea,
 } from "@chakra-ui/react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createPool, type AwardConfigPayload } from "@/lib/api";
+import { createPool, listTournaments, type AwardConfigPayload } from "@/lib/api";
 
 type AwardsState = {
   champion: AwardConfigPayload;
@@ -49,6 +50,15 @@ export default function NewPoolPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
+  const [tournaments, setTournaments] = useState<{ id: number; name: string; year: number; status: string }[]>([]);
+  const [tournamentId, setTournamentId] = useState<number | null>(null);
+
+  useEffect(() => {
+    listTournaments().then((ts) => {
+      setTournaments(ts);
+      if (ts.length > 0) setTournamentId(ts[0].id);
+    });
+  }, []);
 
   function setAwardField(key: keyof AwardsState, field: keyof AwardConfigPayload, value: boolean | number) {
     setAwards((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
@@ -59,9 +69,16 @@ export default function NewPoolPage() {
     setError(null);
     setIsSubmitting(true);
 
+    if (!tournamentId) {
+      setError("Selecione um torneio.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
     try {
       const pool = await createPool({
+        tournamentId,
         name: String(form.get("name")),
         description: String(form.get("description")),
         creatorName: String(form.get("creatorName")),
@@ -97,6 +114,28 @@ export default function NewPoolPage() {
 
         <form onSubmit={onSubmit}>
           <Stack gap={4}>
+            <Field.Root required>
+              <Field.Label>Torneio</Field.Label>
+              {tournaments.length === 0 ? (
+                <Text color="orange.600" fontSize="sm">
+                  Nenhum torneio cadastrado. Peça ao administrador para criar um antes de abrir um bolão.
+                </Text>
+              ) : (
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    value={tournamentId ?? ""}
+                    onChange={(e) => setTournamentId(Number(e.target.value))}
+                  >
+                    {tournaments.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} {t.year}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              )}
+            </Field.Root>
             <Field.Root required>
               <Field.Label>Nome do bolão</Field.Label>
               <Input name="name" placeholder="Bolão da firma" />
@@ -168,7 +207,7 @@ export default function NewPoolPage() {
             </Stack>
 
             {error ? <Text color="red.600">{error}</Text> : null}
-            <Button colorPalette="blue" disabled={isSubmitting} rounded="full" type="submit">
+            <Button colorPalette="blue" disabled={isSubmitting || tournaments.length === 0} rounded="full" type="submit">
               {isSubmitting ? "Criando..." : "Criar bolão"}
             </Button>
           </Stack>

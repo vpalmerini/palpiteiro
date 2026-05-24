@@ -229,13 +229,13 @@ def health():
 @api.post("/pools")
 def create_pool():
     data = _json()
-    required = ["name", "creatorName", "creatorEmail"]
+    required = ["name", "creatorName", "creatorEmail", "tournamentId"]
     if any(not data.get(field) for field in required):
-        abort(400, description="name, creatorName and creatorEmail are required")
+        abort(400, description="name, creatorName, creatorEmail and tournamentId are required")
 
-    tournament = Tournament.query.order_by(Tournament.id).first()
+    tournament = Tournament.query.get(int(data["tournamentId"]))
     if tournament is None:
-        abort(400, description="seed tournament data before creating a pool")
+        abort(404, description="tournament not found")
 
     slug = token_urlsafe(8)
     while Pool.query.filter_by(slug=slug).first() is not None:
@@ -744,6 +744,15 @@ def update_match(match_id):
 # ---------------------------------------------------------------------------
 # Admin — pools per tournament
 # ---------------------------------------------------------------------------
+
+@api.get("/tournaments")
+def list_tournaments_public():
+    tournaments = Tournament.query.order_by(Tournament.year.desc(), Tournament.id.desc()).all()
+    return jsonify([
+        {"id": t.id, "name": t.name, "year": t.year, "status": t.status}
+        for t in tournaments
+    ])
+
 
 @api.get("/teams")
 def list_teams_public():

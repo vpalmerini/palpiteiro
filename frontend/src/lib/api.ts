@@ -23,6 +23,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type AwardConfigPayload = { enabled: boolean; points: number };
 
 export function createPool(payload: {
+  tournamentId: number;
   name: string;
   description: string;
   creatorName: string;
@@ -167,6 +168,10 @@ export function adminUpdateMatch(
 
 export function adminListPools(tournamentId: number) {
   return request<AdminPool[]>(`/admin/tournaments/${tournamentId}/pools`);
+}
+
+export function listTournaments() {
+  return request<{ id: number; name: string; year: number; status: string }[]>("/tournaments");
 }
 
 export function listTeams() {
