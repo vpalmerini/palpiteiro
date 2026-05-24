@@ -91,7 +91,7 @@ export default function MeusBoloes() {
     <Stack gap={8} maxW="3xl" mx="auto">
       <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
         <Heading size="xl">Meus Bolões</Heading>
-        <Button asChild colorPalette="blue" variant="subtle" rounded="full">
+        <Button asChild colorPalette="blue" rounded="full">
           <Link href="/pools/new">+ Criar bolão</Link>
         </Button>
       </HStack>
