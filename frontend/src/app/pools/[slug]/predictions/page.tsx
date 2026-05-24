@@ -176,6 +176,120 @@ export default function PredictionsPage({ params }: PageProps) {
         </Card.Body>
       </Card.Root>
 
+      {pool && (pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) ? (
+        <Card.Root
+          as="section"
+          rounded="2xl"
+          borderWidth={savedAwardPrediction ? "2px" : "1px"}
+          borderColor={savedAwardPrediction ? "green.300" : undefined}
+        >
+          <Card.Body gap={4}>
+            <Stack gap={1}>
+              <Stack direction="row" align="center" gap={2} flexWrap="wrap">
+                <Badge colorPalette="yellow" rounded="full">Palpites especiais</Badge>
+                {savedAwardPrediction ? (
+                  <Badge colorPalette="green" rounded="full" variant="subtle">✓ Salvo</Badge>
+                ) : (
+                  <Badge colorPalette="orange" rounded="full" variant="subtle">Sem palpite</Badge>
+                )}
+              </Stack>
+              <Text color="gray.600" fontSize="sm">
+                {awardLocked
+                  ? "O torneio já começou — palpites especiais bloqueados."
+                  : "Disponíveis até o início do primeiro jogo. Cada acerto vale pontos extras no ranking."}
+              </Text>
+            </Stack>
+
+            <Separator />
+
+            <form onSubmit={onAwardSubmit}>
+              <fieldset disabled={awardLocked || !participantId} style={{ border: "none", padding: 0, margin: 0 }}>
+              <Stack gap={4}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                  {pool.awards.champion.enabled && (
+                    <Field.Root>
+                      <Field.Label>Campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.champion.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.championTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, championTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.runnerUp.enabled && (
+                    <Field.Root>
+                      <Field.Label>Vice-campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.runnerUp.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.runnerUpTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, runnerUpTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.thirdPlace.enabled && (
+                    <Field.Root>
+                      <Field.Label>Terceiro lugar <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.thirdPlace.points} pts</Badge></Field.Label>
+                      <NativeSelect.Root disabled={awardLocked || !participantId}>
+                        <NativeSelect.Field value={awardDraft.thirdPlaceTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, thirdPlaceTeamId: e.target.value }))}>
+                          <option value="">Selecione</option>
+                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                  )}
+                  {pool.awards.topScorer.enabled && (
+                    <Field.Root>
+                      <Field.Label>Artilheiro <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.topScorer.points} pts</Badge></Field.Label>
+                      <Input
+                        placeholder="Nome do jogador"
+                        disabled={awardLocked || !participantId}
+                        value={awardDraft.topScorer}
+                        onChange={(e) => setAwardDraft((d) => ({ ...d, topScorer: e.target.value }))}
+                      />
+                    </Field.Root>
+                  )}
+                  {pool.awards.bestPlayer.enabled && (
+                    <Field.Root>
+                      <Field.Label>Melhor jogador <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.bestPlayer.points} pts</Badge></Field.Label>
+                      <Input
+                        placeholder="Nome do jogador"
+                        disabled={awardLocked || !participantId}
+                        value={awardDraft.bestPlayer}
+                        onChange={(e) => setAwardDraft((d) => ({ ...d, bestPlayer: e.target.value }))}
+                      />
+                    </Field.Root>
+                  )}
+                </SimpleGrid>
+
+                {awardMessage && (
+                  <Text color={awardMessage.includes("Erro") ? "red.600" : "green.600"} fontSize="sm">
+                    {awardMessage}
+                  </Text>
+                )}
+
+                <Button
+                  type="submit"
+                  colorPalette="blue"
+                  rounded="full"
+                  disabled={awardLocked || !participantId}
+                  alignSelf="flex-start"
+                >
+                  {awardLocked
+                    ? "Torneio iniciado — palpites bloqueados"
+                    : savedAwardPrediction ? "Atualizar palpites especiais" : "Salvar palpites especiais"}
+                </Button>
+              </Stack>
+              </fieldset>
+            </form>
+          </Card.Body>
+        </Card.Root>
+      ) : null}
+
       {matches.map((match) => {
         const prediction = predictions[match.id];
         const draft = scoreDrafts[match.id];
@@ -300,119 +414,6 @@ export default function PredictionsPage({ params }: PageProps) {
         );
       })}
 
-      {pool && (pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) ? (
-        <Card.Root
-          as="section"
-          rounded="2xl"
-          borderWidth={savedAwardPrediction ? "2px" : "1px"}
-          borderColor={savedAwardPrediction ? "green.300" : undefined}
-        >
-          <Card.Body gap={4}>
-            <Stack gap={1}>
-              <Stack direction="row" align="center" gap={2} flexWrap="wrap">
-                <Badge colorPalette="yellow" rounded="full">Palpites especiais</Badge>
-                {savedAwardPrediction ? (
-                  <Badge colorPalette="green" rounded="full" variant="subtle">✓ Salvo</Badge>
-                ) : (
-                  <Badge colorPalette="orange" rounded="full" variant="subtle">Sem palpite</Badge>
-                )}
-              </Stack>
-              <Text color="gray.600" fontSize="sm">
-                {awardLocked
-                  ? "O torneio já começou — palpites especiais bloqueados."
-                  : "Disponíveis até o início do primeiro jogo. Cada acerto vale pontos extras no ranking."}
-              </Text>
-            </Stack>
-
-            <Separator />
-
-            <form onSubmit={onAwardSubmit}>
-              <fieldset disabled={awardLocked || !participantId} style={{ border: "none", padding: 0, margin: 0 }}>
-              <Stack gap={4}>
-                <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
-                  {pool.awards.champion.enabled && (
-                    <Field.Root>
-                      <Field.Label>Campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.champion.points} pts</Badge></Field.Label>
-                      <NativeSelect.Root disabled={awardLocked || !participantId}>
-                        <NativeSelect.Field value={awardDraft.championTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, championTeamId: e.target.value }))}>
-                          <option value="">Selecione</option>
-                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </Field.Root>
-                  )}
-                  {pool.awards.runnerUp.enabled && (
-                    <Field.Root>
-                      <Field.Label>Vice-campeão <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.runnerUp.points} pts</Badge></Field.Label>
-                      <NativeSelect.Root disabled={awardLocked || !participantId}>
-                        <NativeSelect.Field value={awardDraft.runnerUpTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, runnerUpTeamId: e.target.value }))}>
-                          <option value="">Selecione</option>
-                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </Field.Root>
-                  )}
-                  {pool.awards.thirdPlace.enabled && (
-                    <Field.Root>
-                      <Field.Label>Terceiro lugar <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.thirdPlace.points} pts</Badge></Field.Label>
-                      <NativeSelect.Root disabled={awardLocked || !participantId}>
-                        <NativeSelect.Field value={awardDraft.thirdPlaceTeamId} onChange={(e) => setAwardDraft((d) => ({ ...d, thirdPlaceTeamId: e.target.value }))}>
-                          <option value="">Selecione</option>
-                          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </Field.Root>
-                  )}
-                  {pool.awards.topScorer.enabled && (
-                    <Field.Root>
-                      <Field.Label>Artilheiro <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.topScorer.points} pts</Badge></Field.Label>
-                      <Input
-                        placeholder="Nome do jogador"
-                        disabled={awardLocked || !participantId}
-                        value={awardDraft.topScorer}
-                        onChange={(e) => setAwardDraft((d) => ({ ...d, topScorer: e.target.value }))}
-                      />
-                    </Field.Root>
-                  )}
-                  {pool.awards.bestPlayer.enabled && (
-                    <Field.Root>
-                      <Field.Label>Melhor jogador <Badge colorPalette="yellow" variant="subtle" ml={1}>{pool.awards.bestPlayer.points} pts</Badge></Field.Label>
-                      <Input
-                        placeholder="Nome do jogador"
-                        disabled={awardLocked || !participantId}
-                        value={awardDraft.bestPlayer}
-                        onChange={(e) => setAwardDraft((d) => ({ ...d, bestPlayer: e.target.value }))}
-                      />
-                    </Field.Root>
-                  )}
-                </SimpleGrid>
-
-                {awardMessage && (
-                  <Text color={awardMessage.includes("Erro") ? "red.600" : "green.600"} fontSize="sm">
-                    {awardMessage}
-                  </Text>
-                )}
-
-                <Button
-                  type="submit"
-                  colorPalette="blue"
-                  rounded="full"
-                  disabled={awardLocked || !participantId}
-                  alignSelf="flex-start"
-                >
-                  {awardLocked
-                    ? "Torneio iniciado — palpites bloqueados"
-                    : savedAwardPrediction ? "Atualizar palpites especiais" : "Salvar palpites especiais"}
-                </Button>
-              </Stack>
-              </fieldset>
-            </form>
-          </Card.Body>
-        </Card.Root>
-      ) : null}
     </Stack>
   );
 }
