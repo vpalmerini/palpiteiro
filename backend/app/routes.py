@@ -536,6 +536,11 @@ def _award_prediction_payload(award_pred: AwardPrediction):
     }
 
 
+def _assert_tournament_editable(tournament: Tournament):
+    if tournament.status == TournamentStatus.FINISHED.value:
+        abort(403, description="O torneio está encerrado e não pode ser editado")
+
+
 def _calculate_award_points(pool: Pool, participant_db_id: int) -> int:
     tournament = pool.tournament
     award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, participant_id=participant_db_id).first()
@@ -614,7 +619,8 @@ def list_stages(tournament_id):
 
 @api.post("/admin/tournaments/<int:tournament_id>/stages")
 def create_stage(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(tournament_id)
+    _assert_tournament_editable(tournament)
     data = _json()
     name = (data.get("name") or "").strip()
     order = data.get("order")
@@ -634,6 +640,7 @@ def create_stage(tournament_id):
 @api.patch("/admin/stages/<int:stage_id>")
 def update_stage(stage_id):
     stage = Stage.query.get_or_404(stage_id)
+    _assert_tournament_editable(stage.tournament)
     data = _json()
     if "name" in data:
         stage.name = (data["name"] or "").strip() or stage.name
@@ -686,7 +693,8 @@ def list_tournament_matches(tournament_id):
 
 @api.post("/admin/tournaments/<int:tournament_id>/matches")
 def create_match(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(tournament_id)
+    _assert_tournament_editable(tournament)
     data = _json()
     stage_id = data.get("stageId")
     starts_at_raw = data.get("startsAt")
@@ -708,6 +716,7 @@ def create_match(tournament_id):
 @api.patch("/admin/matches/<int:match_id>")
 def update_match(match_id):
     match = Match.query.get_or_404(match_id)
+    _assert_tournament_editable(match.tournament)
     data = _json()
 
     if "stageId" in data:
@@ -807,6 +816,7 @@ def upsert_award_prediction(slug):
 @api.patch("/admin/tournaments/<int:tournament_id>/awards")
 def update_tournament_awards(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
+    _assert_tournament_editable(tournament)
     data = _json()
     if "championTeamId" in data:
         tournament.champion_team_id = _parse_optional_int(data["championTeamId"])

@@ -225,11 +225,13 @@ function TeamsPanel({
 function StagesPanel({
   tournamentId,
   stages,
+  isFinished,
   onCreated,
   onUpdated,
 }: {
   tournamentId: number;
   stages: Stage[];
+  isFinished: boolean;
   onCreated: (s: Stage) => void;
   onUpdated: (s: Stage) => void;
 }) {
@@ -346,7 +348,7 @@ function StagesPanel({
                     </Badge>
                   </Table.Cell>
                   <Table.Cell>
-                    <Button size="xs" variant="ghost" onClick={() => startEdit(stage)}>Editar</Button>
+                    <Button size="xs" variant="ghost" disabled={isFinished} onClick={() => startEdit(stage)}>Editar</Button>
                   </Table.Cell>
                 </Table.Row>
               ),
@@ -355,40 +357,42 @@ function StagesPanel({
         </Table.Root>
       )}
 
-      <Card.Root rounded="xl">
-        <Card.Body gap={3}>
-          <Card.Title fontSize="sm">Nova fase</Card.Title>
-          <form onSubmit={handleCreate}>
-            <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
-              <Field.Root required>
-                <Field.Label>Nome</Field.Label>
-                <Input size="sm" placeholder="Fase de grupos" value={name} onChange={(e) => setName(e.target.value)} />
-              </Field.Root>
-              <Field.Root required>
-                <Field.Label>Ordem</Field.Label>
-                <Input size="sm" type="number" value={order} onChange={(e) => setOrder(e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Tipo</Field.Label>
-                <Checkbox.Root
-                  checked={isKnockout}
-                  onCheckedChange={(d) => setIsKnockout(Boolean(d.checked))}
-                  size="sm"
-                  mt={1}
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control />
-                  <Checkbox.Label>Mata-mata</Checkbox.Label>
-                </Checkbox.Root>
-              </Field.Root>
-            </SimpleGrid>
-            {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
-            <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting}>
-              Criar fase
-            </Button>
-          </form>
-        </Card.Body>
-      </Card.Root>
+      {!isFinished && (
+        <Card.Root rounded="xl">
+          <Card.Body gap={3}>
+            <Card.Title fontSize="sm">Nova fase</Card.Title>
+            <form onSubmit={handleCreate}>
+              <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
+                <Field.Root required>
+                  <Field.Label>Nome</Field.Label>
+                  <Input size="sm" placeholder="Fase de grupos" value={name} onChange={(e) => setName(e.target.value)} />
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>Ordem</Field.Label>
+                  <Input size="sm" type="number" value={order} onChange={(e) => setOrder(e.target.value)} />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Tipo</Field.Label>
+                  <Checkbox.Root
+                    checked={isKnockout}
+                    onCheckedChange={(d) => setIsKnockout(Boolean(d.checked))}
+                    size="sm"
+                    mt={1}
+                  >
+                    <Checkbox.HiddenInput />
+                    <Checkbox.Control />
+                    <Checkbox.Label>Mata-mata</Checkbox.Label>
+                  </Checkbox.Root>
+                </Field.Root>
+              </SimpleGrid>
+              {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
+              <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting}>
+                Criar fase
+              </Button>
+            </form>
+          </Card.Body>
+        </Card.Root>
+      )}
     </Stack>
   );
 }
@@ -420,11 +424,13 @@ function MatchRow({
   match,
   stages,
   teams,
+  isFinished,
   onUpdated,
 }: {
   match: Match;
   stages: Stage[];
   teams: Team[];
+  isFinished: boolean;
   onUpdated: (m: Match) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -521,10 +527,10 @@ function MatchRow({
             </Text>
           </Stack>
           <HStack gap={2}>
-            <Button size="xs" variant="outline" onClick={() => { setEditOpen((v) => !v); setResultOpen(false); setError(null); }}>
+            <Button size="xs" variant="outline" disabled={isFinished} onClick={() => { setEditOpen((v) => !v); setResultOpen(false); setError(null); }}>
               {editOpen ? "Cancelar" : "Editar"}
             </Button>
-            <Button size="xs" variant="outline" colorPalette="green" onClick={() => { setResultOpen((v) => !v); setEditOpen(false); setError(null); }}>
+            <Button size="xs" variant="outline" colorPalette="green" disabled={isFinished} onClick={() => { setResultOpen((v) => !v); setEditOpen(false); setError(null); }}>
               {resultOpen ? "Cancelar" : "Resultado"}
             </Button>
           </HStack>
@@ -654,6 +660,7 @@ function MatchesPanel({
   matches,
   stages,
   teams,
+  isFinished,
   onCreated,
   onUpdated,
 }: {
@@ -661,6 +668,7 @@ function MatchesPanel({
   matches: Match[];
   stages: Stage[];
   teams: Team[];
+  isFinished: boolean;
   onCreated: (m: Match) => void;
   onUpdated: (m: Match) => void;
 }) {
@@ -704,7 +712,7 @@ function MatchesPanel({
     <Stack gap={4}>
       <HStack justify="space-between">
         <Heading size="sm">Jogos ({matches.length})</Heading>
-        <Button size="sm" colorPalette="blue" variant="outline" onClick={() => setNewOpen((v) => !v)}>
+        <Button size="sm" colorPalette="blue" variant="outline" disabled={isFinished} onClick={() => setNewOpen((v) => !v)}>
           {newOpen ? "Cancelar" : "+ Novo jogo"}
         </Button>
       </HStack>
@@ -784,7 +792,7 @@ function MatchesPanel({
       ) : (
         <Stack gap={3}>
           {sorted.map((m) => (
-            <MatchRow key={m.id} match={m} stages={stages} teams={teams} onUpdated={onUpdated} />
+            <MatchRow key={m.id} match={m} stages={stages} teams={teams} isFinished={isFinished} onUpdated={onUpdated} />
           ))}
         </Stack>
       )}
@@ -892,10 +900,12 @@ function TournamentStatusControl({
 function AwardsPanel({
   tournament,
   teams,
+  isFinished,
   onUpdated,
 }: {
   tournament: Tournament;
   teams: Team[];
+  isFinished: boolean;
   onUpdated: (t: Tournament) => void;
 }) {
   const aw = tournament.awards;
@@ -1000,7 +1010,7 @@ function AwardsPanel({
           </SimpleGrid>
           {error && <Text color="red.500" fontSize="sm">{error}</Text>}
           <HStack gap={3} align="center">
-            <Button type="submit" size="sm" colorPalette="green" loading={saving}>
+            <Button type="submit" size="sm" colorPalette="green" loading={saving} disabled={isFinished}>
               Salvar premiações
             </Button>
             {saved && <Text color="green.600" fontSize="sm">✓ Salvo</Text>}
@@ -1049,6 +1059,8 @@ function TournamentDetail({
     return <Text color="gray.500">Carregando…</Text>;
   }
 
+  const isFinished = tournament.status === "finished";
+
   return (
     <Stack gap={6}>
       <HStack gap={3} align="center" flexWrap="wrap">
@@ -1056,6 +1068,16 @@ function TournamentDetail({
         <Badge colorPalette="gray" variant="subtle" fontSize="md">{tournament.year}</Badge>
         <TournamentStatusControl tournament={tournament} onUpdated={setTournament} />
       </HStack>
+
+      {isFinished && (
+        <Card.Root rounded="xl" borderWidth="1px" borderColor="orange.300" bg="orange.50">
+          <Card.Body py={3} px={4}>
+            <Text fontSize="sm" color="orange.700">
+              Torneio encerrado — edições bloqueadas. Altere o status para <strong>Em andamento</strong> para retomar edições.
+            </Text>
+          </Card.Body>
+        </Card.Root>
+      )}
 
       <Tabs.Root defaultValue="jogos" variant="line">
         <Tabs.List>
@@ -1072,6 +1094,7 @@ function TournamentDetail({
             matches={matches}
             stages={stages}
             teams={teams}
+            isFinished={isFinished}
             onCreated={(m) => setMatches((prev) => [...prev, m])}
             onUpdated={(m) => setMatches((prev) => prev.map((x) => (x.id === m.id ? m : x)))}
           />
@@ -1085,13 +1108,14 @@ function TournamentDetail({
           <StagesPanel
             tournamentId={tournament.id}
             stages={stages}
+            isFinished={isFinished}
             onCreated={(s) => setStages((prev) => [...prev, s])}
             onUpdated={(s) => setStages((prev) => prev.map((x) => (x.id === s.id ? s : x)))}
           />
         </Tabs.Content>
 
         <Tabs.Content value="premiacoes" pt={4}>
-          <AwardsPanel tournament={tournament} teams={teams} onUpdated={setTournament} />
+          <AwardsPanel tournament={tournament} teams={teams} isFinished={isFinished} onUpdated={setTournament} />
         </Tabs.Content>
 
         <Tabs.Content value="times" pt={4}>
