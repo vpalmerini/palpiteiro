@@ -163,7 +163,7 @@ function TournamentTeamsPanel({
   onRemoved: (teamId: number) => void;
   onCreated: (t: Team) => void;
 }) {
-  const [addTeamId, setAddTeamId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [addError, setAddError] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
 
@@ -176,15 +176,25 @@ function TournamentTeamsPanel({
   const assignedIds = new Set(tournamentTeams.map((t) => t.id));
   const available = allTeams.filter((t) => !assignedIds.has(t.id));
 
-  async function handleAdd() {
-    if (!addTeamId) return;
+  function toggleSelect(teamId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(teamId) ? next.delete(teamId) : next.add(teamId);
+      return next;
+    });
+  }
+
+  async function handleAddSelected() {
+    if (selectedIds.size === 0) return;
     setAddError(null);
     setAddLoading(true);
     try {
-      await adminAddTournamentTeam(tournamentId, Number(addTeamId));
-      const added = allTeams.find((t) => t.id === Number(addTeamId))!;
-      onAdded(added);
-      setAddTeamId("");
+      await Promise.all([...selectedIds].map((id) => adminAddTournamentTeam(tournamentId, id)));
+      for (const id of selectedIds) {
+        const team = allTeams.find((t) => t.id === id);
+        if (team) onAdded(team);
+      }
+      setSelectedIds(new Set());
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Erro ao adicionar");
     } finally {
@@ -267,30 +277,50 @@ function TournamentTeamsPanel({
           {available.length > 0 && (
             <Card.Root rounded="xl">
               <Card.Body gap={3}>
-                <Card.Title fontSize="sm">Adicionar time existente</Card.Title>
-                <HStack gap={2}>
-                  <NativeSelect.Root flex={1} size="sm" disabled={addLoading}>
-                    <NativeSelect.Field value={addTeamId} onChange={(e) => setAddTeamId(e.target.value)}>
-                      <option value="">Selecione um time…</option>
-                      {["national", "club"].map((type) => {
-                        const group = available.filter((t) => t.teamType === type);
-                        if (group.length === 0) return null;
-                        return (
-                          <optgroup key={type} label={TEAM_TYPE_LABELS[type]}>
-                            {group.map((t) => (
-                              <option key={t.id} value={t.id}>{t.name} ({t.shortName})</option>
-                            ))}
-                          </optgroup>
-                        );
-                      })}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                  <Button size="sm" colorPalette="blue" loading={addLoading} disabled={!addTeamId} onClick={handleAdd}>
-                    Adicionar
-                  </Button>
-                </HStack>
+                <Card.Title fontSize="sm">Adicionar times existentes</Card.Title>
+                {["national", "club"].map((type) => {
+                  const group = available.filter((t) => t.teamType === type);
+                  if (group.length === 0) return null;
+                  return (
+                    <Stack key={type} gap={1}>
+                      <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+                        {TEAM_TYPE_LABELS[type]}
+                      </Text>
+                      <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} gap={1}>
+                        {group.map((t) => (
+                          <Checkbox.Root
+                            key={t.id}
+                            size="sm"
+                            checked={selectedIds.has(t.id)}
+                            onCheckedChange={() => toggleSelect(t.id)}
+                            disabled={addLoading}
+                          >
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control />
+                            <Checkbox.Label fontSize="sm">{t.name}{t.shortName ? ` (${t.shortName})` : ""}</Checkbox.Label>
+                          </Checkbox.Root>
+                        ))}
+                      </SimpleGrid>
+                    </Stack>
+                  );
+                })}
                 {addError && <Text color="red.500" fontSize="sm">{addError}</Text>}
+                <HStack gap={3} align="center">
+                  <Button
+                    size="sm"
+                    colorPalette="blue"
+                    loading={addLoading}
+                    disabled={selectedIds.size === 0}
+                    onClick={handleAddSelected}
+                  >
+                    Adicionar {selectedIds.size > 0 ? `(${selectedIds.size})` : "selecionados"}
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                      Limpar seleção
+                    </Button>
+                  )}
+                </HStack>
               </Card.Body>
             </Card.Root>
           )}
