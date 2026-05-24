@@ -200,7 +200,7 @@ export default function NewPoolPage() {
             <Stack gap={3}>
               <Heading size="sm">Pontuação dos jogos</Heading>
               <Text color="gray.600" fontSize="sm">
-                Defina quantos pontos cada tipo de acerto vale nos resultados de cada jogo.
+                Valores sugeridos por ordem de dificuldade — acertar o placar exato é mais difícil e vale mais. Ajuste conforme preferir.
               </Text>
               {(Object.keys(DEFAULT_SCORING) as (keyof ScoringState)[]).map((key) => (
                 <HStack key={key} gap={4} align="center">
@@ -228,7 +228,7 @@ export default function NewPoolPage() {
             <Stack gap={3}>
               <Heading size="sm">Palpites especiais</Heading>
               <Text color="gray.600" fontSize="sm">
-                Permita que os participantes palpitem o campeão, vice e terceiro lugar do torneio, além de artilheiro e melhor jogador. Cada acerto vale os pontos configurados.
+                Habilite palpites sobre o desfecho do torneio. Os valores sugeridos refletem a dificuldade de cada acerto — ajuste conforme preferir.
               </Text>
               {(Object.keys(awards) as (keyof AwardsState)[]).map((key) => (
                 <HStack key={key} gap={4} align="center">
