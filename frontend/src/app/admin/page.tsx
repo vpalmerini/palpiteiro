@@ -135,9 +135,11 @@ function TournamentSidebar({
 
 function TeamsPanel({
   teams,
+  isFinished,
   onCreated,
 }: {
   teams: Team[];
+  isFinished: boolean;
   onCreated: (t: Team) => void;
 }) {
   const [name, setName] = useState("");
@@ -187,33 +189,35 @@ function TeamsPanel({
         </Table.Root>
       )}
 
-      <Card.Root rounded="xl">
-        <Card.Body gap={3}>
-          <Card.Title fontSize="sm">Novo time</Card.Title>
-          <form onSubmit={handleSubmit}>
-            <SimpleGrid columns={2} gap={3}>
-              <Field.Root required>
-                <Field.Label>Nome</Field.Label>
-                <Input size="sm" placeholder="Brasil" value={name} onChange={(e) => setName(e.target.value)} />
-              </Field.Root>
-              <Field.Root required>
-                <Field.Label>Sigla</Field.Label>
-                <Input
-                  size="sm"
-                  placeholder="BRA"
-                  maxLength={12}
-                  value={shortName}
-                  onChange={(e) => setShortName(e.target.value)}
-                />
-              </Field.Root>
-            </SimpleGrid>
-            {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
-            <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting}>
-              Criar time
-            </Button>
-          </form>
-        </Card.Body>
-      </Card.Root>
+      {!isFinished && (
+        <Card.Root rounded="xl">
+          <Card.Body gap={3}>
+            <Card.Title fontSize="sm">Novo time</Card.Title>
+            <form onSubmit={handleSubmit}>
+              <SimpleGrid columns={2} gap={3}>
+                <Field.Root required>
+                  <Field.Label>Nome</Field.Label>
+                  <Input size="sm" placeholder="Brasil" value={name} onChange={(e) => setName(e.target.value)} />
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>Sigla</Field.Label>
+                  <Input
+                    size="sm"
+                    placeholder="BRA"
+                    maxLength={12}
+                    value={shortName}
+                    onChange={(e) => setShortName(e.target.value)}
+                  />
+                </Field.Root>
+              </SimpleGrid>
+              {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
+              <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting}>
+                Criar time
+              </Button>
+            </form>
+          </Card.Body>
+        </Card.Root>
+      )}
     </Stack>
   );
 }
@@ -952,7 +956,7 @@ function AwardsPanel({
           <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
             <Stack gap={1}>
               <Text fontSize="sm" fontWeight="medium">Campeão</Text>
-              <NativeSelect.Root size="sm">
+              <NativeSelect.Root size="sm" disabled={isFinished}>
                 <NativeSelect.Field
                   value={draft.championTeamId}
                   onChange={(e) => { setDraft((d) => ({ ...d, championTeamId: e.target.value })); setSaved(false); }}
@@ -965,7 +969,7 @@ function AwardsPanel({
             </Stack>
             <Stack gap={1}>
               <Text fontSize="sm" fontWeight="medium">Vice-campeão</Text>
-              <NativeSelect.Root size="sm">
+              <NativeSelect.Root size="sm" disabled={isFinished}>
                 <NativeSelect.Field
                   value={draft.runnerUpTeamId}
                   onChange={(e) => { setDraft((d) => ({ ...d, runnerUpTeamId: e.target.value })); setSaved(false); }}
@@ -978,7 +982,7 @@ function AwardsPanel({
             </Stack>
             <Stack gap={1}>
               <Text fontSize="sm" fontWeight="medium">Terceiro lugar</Text>
-              <NativeSelect.Root size="sm">
+              <NativeSelect.Root size="sm" disabled={isFinished}>
                 <NativeSelect.Field
                   value={draft.thirdPlaceTeamId}
                   onChange={(e) => { setDraft((d) => ({ ...d, thirdPlaceTeamId: e.target.value })); setSaved(false); }}
@@ -994,6 +998,7 @@ function AwardsPanel({
               <Input
                 size="sm"
                 placeholder="Nome do jogador"
+                disabled={isFinished}
                 value={draft.topScorer}
                 onChange={(e) => { setDraft((d) => ({ ...d, topScorer: e.target.value })); setSaved(false); }}
               />
@@ -1003,6 +1008,7 @@ function AwardsPanel({
               <Input
                 size="sm"
                 placeholder="Nome do jogador"
+                disabled={isFinished}
                 value={draft.bestPlayer}
                 onChange={(e) => { setDraft((d) => ({ ...d, bestPlayer: e.target.value })); setSaved(false); }}
               />
@@ -1119,7 +1125,7 @@ function TournamentDetail({
         </Tabs.Content>
 
         <Tabs.Content value="times" pt={4}>
-          <TeamsPanel teams={teams} onCreated={onTeamCreated} />
+          <TeamsPanel teams={teams} isFinished={isFinished} onCreated={onTeamCreated} />
         </Tabs.Content>
       </Tabs.Root>
     </Stack>
