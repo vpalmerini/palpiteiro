@@ -14,6 +14,7 @@ export type Pool = {
   name: string;
   description: string | null;
   creatorName: string;
+  tournamentStatus: TournamentStatus;
   scoring: {
     exactScore: number;
     outcome: number;

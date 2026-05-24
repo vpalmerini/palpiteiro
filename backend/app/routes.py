@@ -96,6 +96,7 @@ def _pool_payload(pool: Pool):
             {"position": prize.position, "description": prize.description}
             for prize in prizes
         ],
+        "tournamentStatus": pool.tournament.status,
         "awards": {
             "champion": {"enabled": pool.predict_champion, "points": pool.champion_points},
             "runnerUp": {"enabled": pool.predict_runner_up, "points": pool.runner_up_points},

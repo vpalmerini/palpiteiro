@@ -64,6 +64,9 @@ export default function PredictionsPage({ params }: PageProps) {
       setPool(poolData);
       setMatches(matchData);
       setTeams(teamData);
+      const locked = poolData.tournamentStatus !== "not_started";
+      setAwardLocked(locked);
+      setTournamentStatus(poolData.tournamentStatus);
       setPredictions(Object.fromEntries(predictionData.map((prediction) => [prediction.matchId, prediction])));
       setScoreDrafts(
         Object.fromEntries(
@@ -77,20 +80,16 @@ export default function PredictionsPage({ params }: PageProps) {
           ]),
         ),
       );
-      if (awardData) {
-        setAwardLocked(awardData.isLocked);
-        setTournamentStatus((awardData as { isLocked: boolean; tournamentStatus?: string; prediction: AwardPrediction | null }).tournamentStatus ?? "not_started");
-        if (awardData.prediction) {
-          const p = awardData.prediction;
-          setSavedAwardPrediction(p);
-          setAwardDraft({
-            championTeamId: p.championTeamId ? String(p.championTeamId) : "",
-            runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
-            thirdPlaceTeamId: p.thirdPlaceTeamId ? String(p.thirdPlaceTeamId) : "",
-            topScorer: p.topScorer ?? "",
-            bestPlayer: p.bestPlayer ?? "",
-          });
-        }
+      if (awardData?.prediction) {
+        const p = awardData.prediction;
+        setSavedAwardPrediction(p);
+        setAwardDraft({
+          championTeamId: p.championTeamId ? String(p.championTeamId) : "",
+          runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
+          thirdPlaceTeamId: p.thirdPlaceTeamId ? String(p.thirdPlaceTeamId) : "",
+          topScorer: p.topScorer ?? "",
+          bestPlayer: p.bestPlayer ?? "",
+        });
       }
     });
   }, [slug]);
