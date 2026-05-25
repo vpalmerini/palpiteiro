@@ -12,8 +12,10 @@ import {
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { getParticipantPools } from "@/lib/api";
+import { getMyPools } from "@/lib/api";
+import { useAuth } from "@/contexts/auth";
 import type { MyPoolsByTournament } from "@/types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,50 +25,32 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   ongoing: "green",
-  finished: "blue",
+  finished: "gray",
 };
 
 export default function MeusBoloes() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [groups, setGroups] = useState<MyPoolsByTournament[] | null>(null);
-  const [hasId, setHasId] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const id = window.localStorage.getItem("bolao:participantId");
-    if (!id) {
-      setHasId(false);
-      return;
+    if (!authLoading && !user) {
+      router.replace("/login?next=/meus-boloes");
     }
-    setHasId(true);
-    void getParticipantPools(id).then(setGroups);
-  }, []);
+  }, [user, authLoading, router]);
 
-  if (hasId === null) return null;
+  useEffect(() => {
+    if (!user) return;
+    void getMyPools().then(setGroups);
+  }, [user]);
 
-  if (!hasId) {
-    return (
-      <Stack gap={6} maxW="2xl" mx="auto">
-        <Heading size="xl">Meus Bolões</Heading>
-        <Card.Root rounded="2xl">
-          <Card.Body gap={4}>
-            <Text color="gray.600">
-              Você ainda não criou nem entrou em nenhum bolão neste dispositivo.
-            </Text>
-            <HStack gap={3}>
-              <Button asChild colorPalette="blue" rounded="full" color="white">
-                <Link href="/pools/new">Criar bolão</Link>
-              </Button>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
-      </Stack>
-    );
-  }
+  if (authLoading || !user) return null;
 
   if (!groups) {
     return (
       <Stack gap={6} maxW="2xl" mx="auto">
         <Heading size="xl">Meus Bolões</Heading>
-        <Text color="gray.500">Carregando…</Text>
+        <Text color="fg.muted">Carregando…</Text>
       </Stack>
     );
   }
@@ -77,8 +61,8 @@ export default function MeusBoloes() {
         <Heading size="xl">Meus Bolões</Heading>
         <Card.Root rounded="2xl">
           <Card.Body gap={4}>
-            <Text color="gray.600">Você ainda não participa de nenhum bolão.</Text>
-            <Button asChild colorPalette="blue" rounded="full" alignSelf="flex-start" color="white">
+            <Text color="fg.muted">Você ainda não participa de nenhum bolão.</Text>
+            <Button asChild colorPalette="green" rounded="lg" alignSelf="flex-start" color="white">
               <Link href="/pools/new">Criar bolão</Link>
             </Button>
           </Card.Body>
@@ -91,7 +75,7 @@ export default function MeusBoloes() {
     <Stack gap={8} maxW="3xl" mx="auto">
       <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
         <Heading size="xl">Meus Bolões</Heading>
-        <Button asChild colorPalette="blue" rounded="full" color="white">
+        <Button asChild colorPalette="green" rounded="lg" color="white">
           <Link href="/pools/new">+ Criar bolão</Link>
         </Button>
       </HStack>
@@ -113,18 +97,18 @@ export default function MeusBoloes() {
                   <Card.Body gap={3}>
                     <Stack gap={1}>
                       <Text fontWeight="semibold" fontSize="lg">{pool.name}</Text>
-                      <Text fontSize="sm" color="gray.500">
+                      <Text fontSize="sm" color="fg.muted">
                         Criado por {pool.creatorName} · {pool.participantsCount} participante{pool.participantsCount !== 1 ? "s" : ""}
                       </Text>
                     </Stack>
                     <HStack gap={4}>
                       <Stack gap={0} align="center">
                         <Text fontSize="2xl" fontWeight="bold" lineHeight="1">{pool.myPosition}º</Text>
-                        <Text fontSize="xs" color="gray.500">posição</Text>
+                        <Text fontSize="xs" color="fg.muted">posição</Text>
                       </Stack>
                       <Stack gap={0} align="center">
                         <Text fontSize="2xl" fontWeight="bold" lineHeight="1">{pool.myPoints}</Text>
-                        <Text fontSize="xs" color="gray.500">pontos</Text>
+                        <Text fontSize="xs" color="fg.muted">pontos</Text>
                       </Stack>
                     </HStack>
                   </Card.Body>

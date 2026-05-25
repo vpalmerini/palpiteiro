@@ -2,6 +2,7 @@
 
 import {
   Badge,
+  Box,
   Button,
   Card,
   Field,
@@ -14,22 +15,36 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Share2, Trophy, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { getMatches, getPool, getRanking, joinPool } from "@/lib/api";
-import type { Match, Pool, RankingEntry } from "@/types";
+import { getMatches, getPool, getPredictions, getPoolSnapshots, getRanking, joinPool, ordinalRound } from "@/lib/api";
+import type { Match, Pool, Prediction, RankingEntry, RoundSnapshot } from "@/types";
+import { useAuth } from "@/contexts/auth";
 
 type PageProps = {
   params: { slug: string } | Promise<{ slug: string }>;
 };
 
 export default function PoolPage({ params }: PageProps) {
+  const { user } = useAuth();
   const [slug, setSlug] = useState<string>("");
   const [pool, setPool] = useState<Pool | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
-  const [participantId, setParticipantId] = useState<string | null>(null);
+  const [predictedMatchIds, setPredictedMatchIds] = useState<Set<number>>(new Set());
+  const [snapshots, setSnapshots] = useState<RoundSnapshot[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
@@ -39,17 +54,58 @@ export default function PoolPage({ params }: PageProps) {
 
   useEffect(() => {
     if (!slug) return;
-    void Promise.all([getPool(slug), getMatches(slug), getRanking(slug)]).then(([poolData, matchData, rankingData]) => {
-      setParticipantId(window.localStorage.getItem(`bolao:${slug}:participantId`));
-      setPool(poolData);
-      setMatches(matchData);
-      setRanking(rankingData);
-    });
+    void Promise.all([getPool(slug), getMatches(slug), getRanking(slug)]).then(
+      ([poolData, matchData, rankingData]) => {
+        setPool(poolData);
+        setMatches(matchData);
+        setRanking(rankingData);
+      },
+    );
+    void getPoolSnapshots(slug).then(setSnapshots);
   }, [slug]);
 
-  const publicUrl = useMemo(() => {
-    if (typeof window === "undefined" || !slug) return "";
-    return `${window.location.origin}/pools/${slug}`;
+  // Fetch predictions whenever user or pool membership changes
+  useEffect(() => {
+    if (!slug || !user || !pool?.isParticipant) return;
+    void getPredictions(slug).then((preds) =>
+      setPredictedMatchIds(new Set(preds.map((p) => p.matchId))),
+    );
+  }, [slug, user, pool?.isParticipant]);
+
+  // ── Timeline chart data ────────────────────────────────────────────────────
+  const { chartData, participants, stageNames } = useMemo(() => {
+    if (!snapshots.length) return { chartData: [], participants: [], stageNames: new Set<string>() };
+
+    const stageNamesSet = new Set(snapshots.map((s) => s.stageName));
+    const multipleStages = stageNamesSet.size > 1;
+
+    // Collect all participant ids (ordered by final snapshot position)
+    const lastSnapshot = snapshots[snapshots.length - 1];
+    const participantsSorted = [...lastSnapshot.entries].sort((a, b) => a.position - b.position);
+
+    const chartPoints = snapshots.map((snap) => {
+      const label = multipleStages
+        ? `${snap.stageName.substring(0, 6)}… ${ordinalRound(snap.roundNumber)}`
+        : ordinalRound(snap.roundNumber);
+      const point: Record<string, string | number> = { label };
+      for (const entry of snap.entries) {
+        point[entry.displayName] = entry.position;
+        (point as Record<string, number>)[`${entry.displayName}_pts`] = entry.points;
+      }
+      return point;
+    });
+
+    return { chartData: chartPoints, participants: participantsSorted, stageNames: stageNamesSet };
+  }, [snapshots]);
+
+  const LINE_COLORS = [
+    "#3182CE", "#E53E3E", "#38A169", "#D69E2E", "#805AD5",
+    "#DD6B20", "#319795", "#D53F8C", "#2B6CB0", "#744210",
+  ];
+
+  const [publicUrl, setPublicUrl] = useState("");
+  useEffect(() => {
+    if (slug) setPublicUrl(`${window.location.origin}/pools/${slug}`);
   }, [slug]);
 
   async function onJoin(event: FormEvent<HTMLFormElement>) {
@@ -57,18 +113,10 @@ export default function PoolPage({ params }: PageProps) {
     if (!slug) return;
 
     const form = new FormData(event.currentTarget);
-    const globalId = window.localStorage.getItem("bolao:participantId") ?? undefined;
     const result = await joinPool(slug, {
-      name: String(form.get("name")),
-      email: String(form.get("email")),
       nickname: String(form.get("nickname") || ""),
-      participantId: participantId ?? globalId,
     });
-    window.localStorage.setItem(`bolao:${slug}:participantId`, result.participantId);
-    if (!window.localStorage.getItem("bolao:participantId")) {
-      window.localStorage.setItem("bolao:participantId", result.participantId);
-    }
-    setParticipantId(result.participantId);
+    setPool(result.pool);
     setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
     setRanking(await getRanking(slug));
   }
@@ -88,16 +136,16 @@ export default function PoolPage({ params }: PageProps) {
     <Stack gap={6}>
       <Card.Root as="section" rounded="2xl" shadow="lg">
         <Card.Body gap={4}>
-          <Badge alignSelf="flex-start" colorPalette="blue" rounded="full" px={3} py={1}>
-            Link público
+          <Badge alignSelf="flex-start" colorPalette="green" rounded="full" px={3} py={1}>
+            <HStack gap={1}><Link2 size={12} />Link público</HStack>
           </Badge>
           <Heading as="h1" fontSize={{ base: "3xl", md: "5xl" }}>
             {pool.name}
           </Heading>
-          <Text color="gray.600">{pool.description || "Sem descrição."}</Text>
+          <Text color="fg.muted">{pool.description || "Sem descrição."}</Text>
           <Input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
-          <Button alignSelf="flex-start" colorPalette="blue" onClick={copyPublicLink} rounded="full">
-            Copiar link
+          <Button alignSelf="flex-start" colorPalette="green" color="white" onClick={copyPublicLink} rounded="lg">
+            <HStack gap={2}><Copy size={15} /><span>Copiar link</span></HStack>
           </Button>
           {copyMessage ? <Text color="green.600">{copyMessage}</Text> : null}
         </Card.Body>
@@ -106,35 +154,35 @@ export default function PoolPage({ params }: PageProps) {
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>
-            {participantId ? (
+            {pool.isParticipant ? (
               <>
-                <Card.Title>Você já está no bolão</Card.Title>
-                <Text color="green.600">Sua participação está confirmada neste navegador.</Text>
+                <Card.Title><HStack gap={2}><CheckCircle2 size={18} color="var(--chakra-colors-green-500)" />Você já está no bolão</HStack></Card.Title>
+                <Text color="green.600">Sua participação está confirmada.</Text>
                 {message ? <Text color="green.600">{message}</Text> : null}
-                <Button asChild alignSelf="flex-start" color="white" colorPalette="blue" rounded="full">
-                  <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
+                <Button asChild alignSelf="flex-start" color="white" colorPalette="green" rounded="lg">
+                  <Link href={`/pools/${slug}/predictions`}><HStack gap={2}><ClipboardList size={15} /><span>Fazer palpites</span></HStack></Link>
+                </Button>
+              </>
+            ) : !user ? (
+              <>
+                <Card.Title><HStack gap={2}><UserPlus size={18} />Entrar no bolão</HStack></Card.Title>
+                <Text color="fg.muted">Você precisa estar logado para participar deste bolão.</Text>
+                <Button asChild alignSelf="flex-start" color="white" colorPalette="green" rounded="lg">
+                  <Link href={`/login?next=/pools/${slug}`}><HStack gap={2}><LogIn size={15} /><span>Entrar com Google</span></HStack></Link>
                 </Button>
               </>
             ) : (
               <>
-                <Card.Title>Entrar no bolão</Card.Title>
+                <Card.Title><HStack gap={2}><UserPlus size={18} />Entrar no bolão</HStack></Card.Title>
                 <form onSubmit={onJoin}>
                   <Stack gap={4}>
-                    <Field.Root required>
-                      <Field.Label>Nome</Field.Label>
-                      <Input name="name" placeholder="Seu nome" />
-                    </Field.Root>
                     <Field.Root>
                       <Field.Label>Nickname</Field.Label>
                       <Input name="nickname" placeholder="Como você quer aparecer no ranking" />
-                      <Field.HelperText>Opcional. Se não preencher, seu nome será usado.</Field.HelperText>
-                    </Field.Root>
-                    <Field.Root required>
-                      <Field.Label>E-mail</Field.Label>
-                      <Input name="email" placeholder="seu-email@exemplo.com" type="email" />
+                      <Field.HelperText>Opcional. Se não preencher, seu nome do Google será usado.</Field.HelperText>
                     </Field.Root>
                     {message ? <Text color="green.600">{message}</Text> : null}
-                    <Button colorPalette="blue" rounded="full" type="submit">
+                    <Button colorPalette="green" color="white" rounded="lg" type="submit">
                       Participar
                     </Button>
                   </Stack>
@@ -149,18 +197,18 @@ export default function PoolPage({ params }: PageProps) {
             {pool.description ? (
               <>
                 <Card.Title>Descrição</Card.Title>
-                <Text color="gray.600">{pool.description}</Text>
+                <Text color="fg.muted">{pool.description}</Text>
               </>
             ) : null}
-            <Card.Title>Prêmios</Card.Title>
+            <Card.Title><HStack gap={2}><Trophy size={18} />Prêmios</HStack></Card.Title>
             <Stack gap={3}>
               {pool.prizes.map((prize) => (
-                <Text color="gray.700" key={prize.position}>
-                  <Text as="span" fontWeight="bold">
-                    {prize.position}º lugar:
-                  </Text>{" "}
-                  {prize.description}
-                </Text>
+                <HStack key={prize.position} gap={2}>
+                  <Medal size={15} color={prize.position === 1 ? "gold" : prize.position === 2 ? "silver" : "#cd7f32"} />
+                  <Text color="gray.700">
+                    <Text as="span" fontWeight="bold">{prize.position}º lugar:</Text>{" "}{prize.description}
+                  </Text>
+                </HStack>
               ))}
             </Stack>
           </Card.Body>
@@ -172,23 +220,23 @@ export default function PoolPage({ params }: PageProps) {
           <Card.Title>Regras do bolão</Card.Title>
 
           <Stack gap={1}>
-            <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Pontuação dos jogos</Text>
+            <Text fontSize="sm" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wide">Pontuação dos jogos</Text>
             <SimpleGrid columns={{ base: 2, md: 4 }} gap={3} mt={1}>
               <Stack gap={0}>
                 <Text fontSize="xl" fontWeight="bold">{pool.scoring.exactScore} pts</Text>
-                <Text fontSize="sm" color="gray.600">Placar exato</Text>
+                <Text fontSize="sm" color="fg.muted">Placar exato</Text>
               </Stack>
               <Stack gap={0}>
                 <Text fontSize="xl" fontWeight="bold">{pool.scoring.outcome} pts</Text>
-                <Text fontSize="sm" color="gray.600">Resultado correto</Text>
+                <Text fontSize="sm" color="fg.muted">Resultado correto</Text>
               </Stack>
               <Stack gap={0}>
                 <Text fontSize="xl" fontWeight="bold">{pool.scoring.oneTeamGoals} pt</Text>
-                <Text fontSize="sm" color="gray.600">Gols de um time</Text>
+                <Text fontSize="sm" color="fg.muted">Gols de um time</Text>
               </Stack>
               <Stack gap={0}>
                 <Text fontSize="xl" fontWeight="bold">{pool.scoring.penaltyBonus} pts</Text>
-                <Text fontSize="sm" color="gray.600">Acerto de pênalti</Text>
+                <Text fontSize="sm" color="fg.muted">Acerto de pênalti</Text>
               </Stack>
             </SimpleGrid>
           </Stack>
@@ -198,7 +246,7 @@ export default function PoolPage({ params }: PageProps) {
             <>
               <Separator />
               <Stack gap={1}>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Palpites especiais</Text>
+                <Text fontSize="sm" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wide">Palpites especiais</Text>
                 <SimpleGrid columns={{ base: 2, md: 3 }} gap={3} mt={1}>
                   {pool.awards.champion.enabled && (
                     <HStack gap={2}>
@@ -238,7 +286,7 @@ export default function PoolPage({ params }: PageProps) {
           <Separator />
 
           <Stack gap={1}>
-            <Text fontSize="sm" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">Critérios de desempate</Text>
+            <Text fontSize="sm" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wide">Critérios de desempate</Text>
             <Stack gap={1} mt={1}>
               {[
                 "Maior número de placares exatos",
@@ -272,7 +320,7 @@ export default function PoolPage({ params }: PageProps) {
               </Table.Header>
               <Table.Body>
                 {ranking.map((entry) => (
-                  <Table.Row key={entry.participantId}>
+                  <Table.Row key={entry.userId}>
                     <Table.Cell>{entry.position}</Table.Cell>
                     <Table.Cell>{entry.displayName}</Table.Cell>
                     <Table.Cell textAlign="center" fontWeight="semibold">{entry.points}</Table.Cell>
@@ -284,31 +332,130 @@ export default function PoolPage({ params }: PageProps) {
               </Table.Body>
             </Table.Root>
           </Table.ScrollArea>
-          {ranking.length === 0 ? <Text color="gray.600">Nenhum participante ainda.</Text> : null}
+          {ranking.length === 0 ? <Text color="fg.muted">Nenhum participante ainda.</Text> : null}
         </Card.Body>
       </Card.Root>
 
+      {snapshots.length > 0 && (
+        <Card.Root as="section" rounded="2xl">
+          <Card.Body gap={4}>
+            <Card.Title><HStack gap={2}><LineChartIcon size={18} />Timeline do ranking</HStack></Card.Title>
+            {stageNames.size > 0 && (
+              <HStack gap={2} flexWrap="wrap">
+                {[...stageNames].map((name) => (
+                  <Badge key={name} variant="outline" colorPalette="green" fontSize="xs">{name}</Badge>
+                ))}
+              </HStack>
+            )}
+            <Box w="full" h={{ base: "280px", md: "360px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chakra-colors-gray-200)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    reversed
+                    allowDecimals={false}
+                    tick={{ fontSize: 11 }}
+                    domain={[1, participants.length || 1]}
+                    label={{ value: "Pos.", angle: -90, position: "insideLeft", offset: 20, style: { fontSize: 11 } }}
+                  />
+                  <Tooltip
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    content={({ active, payload, label }: any) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <Box bg="white" border="1px solid" borderColor="gray.200" rounded="md" p={3} shadow="md" fontSize="sm">
+                          <Text fontWeight="semibold" mb={1}>{label}</Text>
+                          {payload
+                            .filter((entry: any) => !String(entry.dataKey).endsWith("_pts"))
+                            .sort((a: any, b: any) => a.value - b.value)
+                            .map((entry: any) => {
+                              const pts = payload.find((e: any) => e.dataKey === `${entry.dataKey}_pts`)?.value;
+                              return (
+                                <HStack key={entry.dataKey} gap={2}>
+                                  <Box w={3} h={3} rounded="full" bg={entry.color} flexShrink={0} />
+                                  <Text color="gray.700">{entry.name}: <Text as="span" fontWeight="bold">{entry.value}º</Text>{pts != null ? ` (${pts} pts)` : ""}</Text>
+                                </HStack>
+                              );
+                            })}
+                        </Box>
+                      );
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: string) => (value as any).endsWith("_pts") ? null : value}
+                  />
+                  {participants.map((p, idx) => (
+                    <Line
+                      key={p.userId}
+                      type="monotone"
+                      dataKey={p.displayName}
+                      stroke={LINE_COLORS[idx % LINE_COLORS.length]}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+            <Text fontSize="xs" color="fg.muted">
+              Posição no ranking ao final de cada rodada finalizada pelo admin.
+            </Text>
+          </Card.Body>
+        </Card.Root>
+      )}
+
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
-          <Card.Title>Próximos jogos</Card.Title>
-          <Stack gap={3}>
-            {matches.map((match) => (
-              <Card.Root key={match.id} rounded="xl" variant="outline">
-                <Card.Body gap={3}>
-                  <Text fontWeight="bold">
-                    {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
-                  </Text>
-                  <Text color="gray.600">
-                    {match.stage.name} · {new Date(match.startsAt).toLocaleString("pt-BR")} ·{" "}
-                    {match.isLocked ? "palpites bloqueados" : "palpites abertos"}
-                  </Text>
-                  <Button asChild alignSelf="flex-start" colorPalette="blue" rounded="full" size="sm" variant="subtle">
-                    <Link href={`/pools/${slug}/predictions`}>Fazer palpites</Link>
-                  </Button>
-                </Card.Body>
-              </Card.Root>
-            ))}
-          </Stack>
+          <Card.Title><HStack gap={2}><CalendarDays size={18} />Próximos jogos</HStack></Card.Title>
+          <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
+            {matches.map((match) => {
+              const hasPrediction = predictedMatchIds.has(match.id);
+              return (
+                <Card.Root
+                  key={match.id}
+                  rounded="xl"
+                  variant="outline"
+                  borderColor={hasPrediction ? "green.300" : undefined}
+                  borderWidth={hasPrediction ? "2px" : "1px"}
+                >
+                  <Card.Body gap={2} p={3}>
+                    <Text fontWeight="bold" fontSize="sm" lineClamp={2}>
+                      {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
+                    </Text>
+                    <Text color="fg.muted" fontSize="xs">
+                      {match.stage.name}{match.group ? ` · ${match.group.name}` : ""}
+                    </Text>
+                    <Text color="fg.muted" fontSize="xs">
+                      {new Date(match.startsAt).toLocaleString("pt-BR")}
+                    </Text>
+                    <HStack justify="space-between" align="center" mt={1}>
+                    <Badge
+                      colorPalette={hasPrediction ? "green" : match.isLocked ? "red" : "gray"}
+                      variant="subtle"
+                      rounded="full"
+                      fontSize="xs"
+                    >
+                      <HStack gap={1}>
+                        {hasPrediction ? <CheckCircle2 size={10} /> : match.isLocked ? <Lock size={10} /> : <Clock size={10} />}
+                        {hasPrediction ? "Palpitado" : match.isLocked ? "Bloqueado" : "Sem palpite"}
+                      </HStack>
+                    </Badge>
+                        <Button asChild colorPalette="green" rounded="lg" size="xs" variant="subtle">
+                        <Link href={`/pools/${slug}/predictions`}>
+                          {hasPrediction ? "Mudar palpite" : "Palpitar"}
+                        </Link>
+                      </Button>
+                    </HStack>
+                  </Card.Body>
+                </Card.Root>
+              );
+            })}
+          </SimpleGrid>
         </Card.Body>
       </Card.Root>
     </Stack>

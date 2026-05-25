@@ -20,6 +20,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createPool, listTournaments, type AwardConfigPayload } from "@/lib/api";
+import { useAuth } from "@/contexts/auth";
 
 type ScoringState = {
   exactScore: number;
@@ -68,12 +69,19 @@ const DEFAULT_AWARDS: AwardsState = {
 
 export default function NewPoolPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scoring, setScoring] = useState<ScoringState>(DEFAULT_SCORING);
   const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
   const [tournaments, setTournaments] = useState<{ id: number; name: string; year: number; status: string }[]>([]);
   const [tournamentId, setTournamentId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login?next=/pools/new");
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     listTournaments().then((ts) => {
@@ -103,8 +111,6 @@ export default function NewPoolPage() {
         tournamentId,
         name: String(form.get("name")),
         description: String(form.get("description")),
-        creatorName: String(form.get("creatorName")),
-        creatorEmail: String(form.get("creatorEmail")),
         creatorNickname: String(form.get("creatorNickname") || ""),
         prizes: [1, 2, 3].map((position) => ({
           position,
@@ -113,10 +119,6 @@ export default function NewPoolPage() {
         scoring,
         awards,
       });
-      window.localStorage.setItem(`bolao:${pool.slug}:participantId`, pool.creatorParticipantId);
-      if (!window.localStorage.getItem("bolao:participantId")) {
-        window.localStorage.setItem("bolao:participantId", pool.creatorParticipantId);
-      }
       router.push(`/pools/${pool.slug}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível criar o bolão.");
@@ -129,13 +131,13 @@ export default function NewPoolPage() {
     <Card.Root as="section" maxW="3xl" mx="auto" rounded="2xl" shadow="lg">
       <Card.Body gap={6}>
         <Stack gap={3}>
-          <Badge alignSelf="flex-start" colorPalette="blue" rounded="full" px={3} py={1}>
+          <Badge alignSelf="flex-start" colorPalette="green" rounded="full" px={3} py={1}>
             Novo bolão
           </Badge>
           <Heading as="h1" fontSize={{ base: "3xl", md: "5xl" }}>
             Configure a experiência
           </Heading>
-          <Text color="gray.600">Defina o nome, os prêmios e compartilhe o link público com os participantes.</Text>
+          <Text color="fg.muted">Defina o nome, os prêmios e compartilhe o link público com os participantes.</Text>
         </Stack>
 
         <form onSubmit={onSubmit}>
@@ -166,18 +168,10 @@ export default function NewPoolPage() {
               <Field.Label>Nome do bolão</Field.Label>
               <Input name="name" placeholder="Bolão da firma" />
             </Field.Root>
-            <Field.Root required>
-              <Field.Label>Nome</Field.Label>
-              <Input name="creatorName" placeholder="Victor" />
-            </Field.Root>
-            <Field.Root required>
-              <Field.Label>E-mail</Field.Label>
-              <Input name="creatorEmail" placeholder="seu-email@exemplo.com" type="email" />
-            </Field.Root>
             <Field.Root>
               <Field.Label>Nickname</Field.Label>
               <Input name="creatorNickname" placeholder="Como você quer aparecer no ranking" />
-              <Field.HelperText>Opcional. Se não preencher, o nome do criador será usado.</Field.HelperText>
+              <Field.HelperText>Opcional. Se não preencher, seu nome do Google será usado.</Field.HelperText>
             </Field.Root>
             <Field.Root>
               <Field.Label>Descrição</Field.Label>
@@ -202,14 +196,14 @@ export default function NewPoolPage() {
 
             <Stack gap={3}>
               <Heading size="sm">Pontuação dos jogos</Heading>
-              <Text color="gray.600" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 Valores sugeridos por ordem de dificuldade — acertar o placar exato é mais difícil e vale mais. Ajuste conforme preferir.
               </Text>
               {(Object.keys(DEFAULT_SCORING) as (keyof ScoringState)[]).map((key) => (
                 <HStack key={key} gap={4} align="center">
                   <Stack flex="1" gap={0}>
                     <Text fontSize="sm" fontWeight="medium">{SCORING_LABELS[key].label}</Text>
-                    <Text fontSize="xs" color="gray.500">{SCORING_LABELS[key].helper}</Text>
+                    <Text fontSize="xs" color="fg.muted">{SCORING_LABELS[key].helper}</Text>
                   </Stack>
                   <HStack gap={2} align="center">
                     <Input
@@ -220,7 +214,7 @@ export default function NewPoolPage() {
                       value={scoring[key]}
                       onChange={(e) => setScoring((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
                     />
-                    <Text fontSize="sm" color="gray.500" whiteSpace="nowrap">pts</Text>
+                    <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">pts</Text>
                   </HStack>
                 </HStack>
               ))}
@@ -230,7 +224,7 @@ export default function NewPoolPage() {
 
             <Stack gap={3}>
               <Heading size="sm">Palpites especiais</Heading>
-              <Text color="gray.600" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 Habilite palpites sobre o desfecho do torneio. Os valores sugeridos refletem a dificuldade de cada acerto — ajuste conforme preferir.
               </Text>
               {(Object.keys(awards) as (keyof AwardsState)[]).map((key) => (
@@ -254,14 +248,14 @@ export default function NewPoolPage() {
                       onChange={(e) => setAwardField(key, "points", Number(e.target.value))}
                       disabled={!awards[key].enabled}
                     />
-                    <Text fontSize="sm" color="gray.500" whiteSpace="nowrap">pts</Text>
+                    <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">pts</Text>
                   </HStack>
                 </HStack>
               ))}
             </Stack>
 
             {error ? <Text color="red.600">{error}</Text> : null}
-            <Button colorPalette="blue" disabled={isSubmitting || tournaments.length === 0} rounded="full" type="submit">
+            <Button colorPalette="green" color="white" disabled={isSubmitting || tournaments.length === 0} rounded="lg" type="submit">
               {isSubmitting ? "Criando..." : "Criar bolão"}
             </Button>
           </Stack>

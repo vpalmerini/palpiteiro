@@ -5,3 +5,5 @@ Flask-Cors
 psycopg[binary]
 python-dotenv
 pytest
+google-auth
+PyJWT

@@ -18,14 +18,24 @@ import {
   Text,
 } from "@chakra-ui/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { useAuth } from "@/contexts/auth";
 import {
   adminAddTournamentTeam,
+  adminAssignTeamGroup,
+  adminCreateGroup,
+  adminListTournamentGroups,
   adminCreateMatch,
+  adminCreateRound,
   adminCreateStage,
   adminCreateTeam,
   adminCreateTournament,
+  adminDeleteGroup,
   adminDeleteMatch,
+  adminDeleteRound,
+  adminDeleteStage,
+  adminGenerateRoundSnapshot,
   adminListMatches,
   adminListPools,
   adminListStages,
@@ -33,12 +43,15 @@ import {
   adminListTournamentTeams,
   adminListTournaments,
   adminRemoveTournamentTeam,
+  adminRenameGroup,
   adminUpdateMatch,
+  adminUpdateRound,
   adminUpdateStage,
   adminUpdateTournamentAwards,
   adminUpdateTournamentStatus,
+  ordinalRound,
 } from "@/lib/api";
-import type { AdminPool, Match, Stage, Team, Tournament, TournamentStatus } from "@/types";
+import type { AdminPool, Match, Round, Stage, Team, TournamentGroup, TournamentTeamEntry, Tournament, TournamentStatus } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Tournament selector
@@ -155,14 +168,16 @@ function TournamentTeamsPanel({
   onAdded,
   onRemoved,
   onCreated,
+  onTeamGroupChanged,
 }: {
   tournamentId: number;
   allTeams: Team[];
-  tournamentTeams: Team[];
+  tournamentTeams: TournamentTeamEntry[];
   isFinished: boolean;
-  onAdded: (t: Team) => void;
+  onAdded: (t: TournamentTeamEntry) => void;
   onRemoved: (teamId: number) => void;
   onCreated: (t: Team) => void;
+  onTeamGroupChanged: (entry: TournamentTeamEntry) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [addError, setAddError] = useState<string | null>(null);
@@ -173,6 +188,12 @@ function TournamentTeamsPanel({
   const [teamType, setTeamType] = useState("national");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
+
+  const [availableGroups, setAvailableGroups] = useState<TournamentGroup[]>([]);
+
+  useEffect(() => {
+    adminListTournamentGroups(tournamentId).then(setAvailableGroups);
+  }, [tournamentId]);
 
   const assignedIds = new Set(tournamentTeams.map((t) => t.id));
   const available = allTeams.filter((t) => !assignedIds.has(t.id));
@@ -193,7 +214,7 @@ function TournamentTeamsPanel({
       await Promise.all([...selectedIds].map((id) => adminAddTournamentTeam(tournamentId, id)));
       for (const id of selectedIds) {
         const team = allTeams.find((t) => t.id === id);
-        if (team) onAdded(team);
+        if (team) onAdded({ ...team, groupId: null, groupName: null });
       }
       setSelectedIds(new Set());
     } catch (err) {
@@ -220,7 +241,7 @@ function TournamentTeamsPanel({
       const t = await adminCreateTeam({ name: name.trim(), shortName: shortName.trim().toUpperCase(), teamType });
       onCreated(t);
       await adminAddTournamentTeam(tournamentId, t.id);
-      onAdded(t);
+      onAdded({ ...t, groupId: null, groupName: null });
       setName("");
       setShortName("");
       setTeamType("national");
@@ -230,6 +251,8 @@ function TournamentTeamsPanel({
       setCreateLoading(false);
     }
   }
+
+  const allGroups = availableGroups;
 
   return (
     <Stack gap={4}>
@@ -243,32 +266,57 @@ function TournamentTeamsPanel({
               <Table.ColumnHeader>Nome</Table.ColumnHeader>
               <Table.ColumnHeader>Sigla</Table.ColumnHeader>
               <Table.ColumnHeader>Tipo</Table.ColumnHeader>
+              <Table.ColumnHeader>Grupo</Table.ColumnHeader>
               <Table.ColumnHeader />
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {tournamentTeams.map((t) => (
-              <Table.Row key={t.id}>
-                <Table.Cell>{t.name}</Table.Cell>
-                <Table.Cell><Badge variant="subtle">{t.shortName}</Badge></Table.Cell>
-                <Table.Cell>
-                  <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
-                    {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    colorPalette="red"
-                    disabled={isFinished}
-                    onClick={() => handleRemove(t.id)}
-                  >
-                    Remover
-                  </Button>
-                </Table.Cell>
-              </Table.Row>
-            ))}
+            {tournamentTeams.map((t) => {
+              return (
+                <Table.Row key={t.id}>
+                  <Table.Cell>{t.name}</Table.Cell>
+                  <Table.Cell>{t.shortName ? <Badge variant="subtle">{t.shortName}</Badge> : <Text color="gray.400" fontSize="xs">—</Text>}</Table.Cell>
+                  <Table.Cell>
+                    <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
+                      {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
+                    </Badge>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {allGroups.length > 0 ? (
+                      <NativeSelect.Root size="xs" minW="120px" disabled={isFinished}>
+                        <NativeSelect.Field
+                          value={t.groupId != null ? String(t.groupId) : ""}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            const updated = await adminAssignTeamGroup(tournamentId, t.id, val ? Number(val) : null);
+                            onTeamGroupChanged(updated);
+                          }}
+                        >
+                          <option value="">—</option>
+                          {allGroups.map((g) => (
+                            <option key={g.id} value={String(g.id)}>{g.name}</option>
+                          ))}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    ) : (
+                      <Text color="gray.400" fontSize="xs">—</Text>
+                    )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="red"
+                      disabled={isFinished}
+                      onClick={() => handleRemove(t.id)}
+                    >
+                      Remover
+                    </Button>
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
           </Table.Body>
         </Table.Root>
       )}
@@ -385,12 +433,14 @@ function StagesPanel({
   isFinished,
   onCreated,
   onUpdated,
+  onDeleted,
 }: {
   tournamentId: number;
   stages: Stage[];
   isFinished: boolean;
   onCreated: (s: Stage) => void;
   onUpdated: (s: Stage) => void;
+  onDeleted: (stageId: number) => void;
 }) {
   const [name, setName] = useState("");
   const [order, setOrder] = useState(String(stages.length + 1));
@@ -504,7 +554,22 @@ function StagesPanel({
                     </Badge>
                   </Table.Cell>
                   <Table.Cell>
-                    <Button size="xs" variant="ghost" disabled={isFinished} onClick={() => startEdit(stage)}>Editar</Button>
+                    <HStack gap={1}>
+                      <Button size="xs" variant="ghost" disabled={isFinished} onClick={() => startEdit(stage)}>Editar</Button>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        colorPalette="red"
+                        disabled={isFinished}
+                        onClick={async () => {
+                          if (!confirm(`Deletar a fase "${stage.name}"? Todos os jogos associados serão removidos.`)) return;
+                          await adminDeleteStage(stage.id);
+                          onDeleted(stage.id);
+                        }}
+                      >
+                        Deletar
+                      </Button>
+                    </HStack>
                   </Table.Cell>
                 </Table.Row>
               ),
@@ -512,6 +577,24 @@ function StagesPanel({
           </Table.Body>
         </Table.Root>
       )}
+
+      {sorted.filter((s) => s.stageType === "group").map((s) => (
+        <GroupsSubPanel
+          key={s.id}
+          stage={s}
+          isFinished={isFinished}
+          onGroupsChanged={(groups) => onUpdated({ ...s, groups })}
+        />
+      ))}
+
+      {sorted.map((s) => (
+        <RoundsSubPanel
+          key={s.id}
+          stage={s}
+          isFinished={isFinished}
+          onRoundsChanged={(rounds) => onUpdated({ ...s, rounds })}
+        />
+      ))}
 
       {!isFinished && (
         <Card.Root rounded="xl">
@@ -552,11 +635,245 @@ function StagesPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Groups sub-panel (used inside StagesPanel)
+// ---------------------------------------------------------------------------
+
+function GroupsSubPanel({
+  stage,
+  isFinished,
+  onGroupsChanged,
+}: {
+  stage: Stage;
+  isFinished: boolean;
+  onGroupsChanged: (groups: TournamentGroup[]) => void;
+}) {
+  const [groups, setGroups] = useState<TournamentGroup[]>(stage.groups);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+
+  function sync(updated: TournamentGroup[]) {
+    setGroups(updated);
+    onGroupsChanged(updated);
+  }
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const g = await adminCreateGroup(stage.id, { name: newName.trim() });
+      const updated = [...groups, g].sort((a, b) => a.name.localeCompare(b.name));
+      sync(updated);
+      setNewName("");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(groupId: number) {
+    if (!confirm("Deletar este grupo? Os times serão desassociados.")) return;
+    await adminDeleteGroup(groupId);
+    sync(groups.filter((g) => g.id !== groupId));
+  }
+
+  async function handleRename(groupId: number) {
+    if (!editName.trim()) return;
+    const g = await adminRenameGroup(groupId, { name: editName.trim() });
+    sync(groups.map((x) => (x.id === groupId ? g : x)));
+    setEditingId(null);
+  }
+
+  return (
+    <Stack gap={2} pl={4} borderLeftWidth="2px" borderColor="blue.100">
+      <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+        Grupos de {stage.name}
+      </Text>
+      {groups.length === 0 ? (
+        <Text fontSize="sm" color="gray.400">Nenhum grupo criado.</Text>
+      ) : (
+        <Stack gap={1}>
+          {groups.map((g) =>
+            editingId === g.id ? (
+              <HStack key={g.id} gap={2}>
+                <Input size="xs" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                <Button size="xs" colorPalette="green" onClick={() => handleRename(g.id)}>Salvar</Button>
+                <Button size="xs" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+              </HStack>
+            ) : (
+              <HStack key={g.id} gap={2} justify="space-between">
+                <Badge variant="subtle" colorPalette="blue">{g.name}</Badge>
+                {!isFinished && (
+                  <HStack gap={1}>
+                    <Button size="xs" variant="ghost" onClick={() => { setEditingId(g.id); setEditName(g.name); }}>Renomear</Button>
+                    <Button size="xs" variant="ghost" colorPalette="red" onClick={() => handleDelete(g.id)}>Deletar</Button>
+                  </HStack>
+                )}
+              </HStack>
+            )
+          )}
+        </Stack>
+      )}
+      {!isFinished && (
+        <form onSubmit={handleCreate}>
+          <HStack gap={2}>
+            <Input size="xs" placeholder="Grupo A" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Button type="submit" size="xs" colorPalette="blue" loading={creating} disabled={!newName.trim()}>
+              + Grupo
+            </Button>
+          </HStack>
+        </form>
+      )}
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rounds sub-panel (used inside StagesPanel)
+// ---------------------------------------------------------------------------
+
+function RoundsSubPanel({
+  stage,
+  isFinished,
+  onRoundsChanged,
+}: {
+  stage: Stage;
+  isFinished: boolean;
+  onRoundsChanged: (rounds: Round[]) => void;
+}) {
+  const [rounds, setRounds] = useState<Round[]>(stage.rounds);
+  const [newNumber, setNewNumber] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editNumber, setEditNumber] = useState("");
+  const [snapshotting, setSnapshotting] = useState<number | null>(null);
+  const [snapshotDone, setSnapshotDone] = useState<Record<number, string>>({});
+
+  function sync(updated: Round[]) {
+    const sorted = [...updated].sort((a, b) => a.number - b.number);
+    setRounds(sorted);
+    onRoundsChanged(sorted);
+  }
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    const num = parseInt(newNumber, 10);
+    if (isNaN(num)) return;
+    setCreating(true);
+    try {
+      const r = await adminCreateRound(stage.id, { number: num });
+      sync([...rounds, r]);
+      setNewNumber("");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(roundId: number) {
+    if (!confirm("Deletar esta rodada? Todos os jogos associados serão removidos.")) return;
+    await adminDeleteRound(roundId);
+    sync(rounds.filter((r) => r.id !== roundId));
+  }
+
+  async function handleRenumber(roundId: number) {
+    const num = parseInt(editNumber, 10);
+    if (isNaN(num)) return;
+    const r = await adminUpdateRound(roundId, { number: num });
+    sync(rounds.map((x) => (x.id === roundId ? r : x)));
+    setEditingId(null);
+  }
+
+  return (
+    <Stack gap={2} pl={4} borderLeftWidth="2px" borderColor="teal.100">
+      <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+        Rodadas de {stage.name}
+      </Text>
+      {rounds.length === 0 ? (
+        <Text fontSize="sm" color="gray.400">Nenhuma rodada criada.</Text>
+      ) : (
+        <Stack gap={1}>
+          {rounds.map((r) =>
+            editingId === r.id ? (
+              <HStack key={r.id} gap={2}>
+                <Input
+                  size="xs"
+                  type="number"
+                  w="20"
+                  value={editNumber}
+                  onChange={(e) => setEditNumber(e.target.value)}
+                  autoFocus
+                />
+                <Button size="xs" colorPalette="green" onClick={() => handleRenumber(r.id)}>Salvar</Button>
+                <Button size="xs" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+              </HStack>
+            ) : (
+              <HStack key={r.id} gap={2} justify="space-between" flexWrap="wrap">
+                <HStack gap={2}>
+                  <Badge variant="subtle" colorPalette="teal">{ordinalRound(r.number)}</Badge>
+                  {snapshotDone[r.id] && (
+                    <Text fontSize="xs" color="green.600">✓ snapshot {snapshotDone[r.id]}</Text>
+                  )}
+                </HStack>
+                <HStack gap={1}>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    colorPalette="teal"
+                    loading={snapshotting === r.id}
+                    onClick={async () => {
+                      setSnapshotting(r.id);
+                      try {
+                        const res = await adminGenerateRoundSnapshot(r.id);
+                        setSnapshotDone((prev) => ({ ...prev, [r.id]: `(${res.poolsSnapshotted} bolões)` }));
+                      } finally {
+                        setSnapshotting(null);
+                      }
+                    }}
+                  >
+                    Snapshot
+                  </Button>
+                  {!isFinished && (
+                    <>
+                      <Button size="xs" variant="ghost" onClick={() => { setEditingId(r.id); setEditNumber(String(r.number)); }}>Renumerar</Button>
+                      <Button size="xs" variant="ghost" colorPalette="red" onClick={() => handleDelete(r.id)}>Deletar</Button>
+                    </>
+                  )}
+                </HStack>
+              </HStack>
+            )
+          )}
+        </Stack>
+      )}
+      {!isFinished && (
+        <form onSubmit={handleCreate}>
+          <HStack gap={2}>
+            <Input
+              size="xs"
+              type="number"
+              placeholder={String(rounds.length + 1)}
+              w="20"
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value)}
+            />
+            <Button type="submit" size="xs" colorPalette="teal" loading={creating} disabled={!newNumber.trim()}>
+              + Rodada
+            </Button>
+          </HStack>
+        </form>
+      )}
+    </Stack>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
 // Matches panel
 // ---------------------------------------------------------------------------
 
 type MatchDraft = {
   stageId: string;
+  roundId: string;
   homeTeamId: string;
   awayTeamId: string;
   startsAt: string;
@@ -593,6 +910,7 @@ function MatchRow({
   const [resultOpen, setResultOpen] = useState(false);
   const [draft, setDraft] = useState<MatchDraft>({
     stageId: String(match.stage.id),
+    roundId: String(match.round.id),
     homeTeamId: match.homeTeam ? String(match.homeTeam.id) : "",
     awayTeamId: match.awayTeam ? String(match.awayTeam.id) : "",
     startsAt: toLocalDatetimeValue(match.startsAt),
@@ -605,6 +923,8 @@ function MatchRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedStageForEdit = stages.find((s) => s.id === Number(draft.stageId));
+  const roundsForEdit = selectedStageForEdit?.rounds ?? [];
   const currentStage = stages.find((s) => s.id === match.stage.id);
   const isResultDraw =
     currentStage?.isKnockout &&
@@ -618,7 +938,7 @@ function MatchRow({
     setSaving(true);
     try {
       const updated = await adminUpdateMatch(match.id, {
-        stageId: Number(draft.stageId),
+        roundId: Number(draft.roundId),
         homeTeamId: draft.homeTeamId ? Number(draft.homeTeamId) : null,
         awayTeamId: draft.awayTeamId ? Number(draft.awayTeamId) : null,
         startsAt: new Date(draft.startsAt).toISOString(),
@@ -666,6 +986,16 @@ function MatchRow({
               <Badge colorPalette={STAGE_TYPE_COLORS[match.stage.stageType] ?? "gray"} variant="subtle" rounded="full">
                 {match.stage.name}
               </Badge>
+              {match.stage.stageType !== "knockout" && (
+                <Badge colorPalette="teal" variant="subtle" rounded="full">
+                  {ordinalRound(match.round.number)}
+                </Badge>
+              )}
+              {match.group && (
+                <Badge colorPalette="blue" variant="outline" rounded="full">
+                  {match.group.name}
+                </Badge>
+              )}
               <Badge colorPalette={statusColor} variant="subtle" rounded="full">
                 {statusLabel}
               </Badge>
@@ -714,10 +1044,25 @@ function MatchRow({
                   <NativeSelect.Root size="sm">
                     <NativeSelect.Field
                       value={draft.stageId}
-                      onChange={(e) => setDraft((d) => ({ ...d, stageId: e.target.value }))}
+                      onChange={(e) => setDraft((d) => ({ ...d, stageId: e.target.value, roundId: "" }))}
                     >
                       {stages.map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>Rodada</Field.Label>
+                  <NativeSelect.Root size="sm" disabled={roundsForEdit.length === 0}>
+                    <NativeSelect.Field
+                      value={draft.roundId}
+                      onChange={(e) => setDraft((d) => ({ ...d, roundId: e.target.value }))}
+                    >
+                      {roundsForEdit.length === 0 && <option value="">Cadastre uma rodada primeiro</option>}
+                      {roundsForEdit.map((r) => (
+                        <option key={r.id} value={r.id}>{ordinalRound(r.number)}</option>
                       ))}
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />
@@ -846,6 +1191,7 @@ function MatchesPanel({
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<MatchDraft>({
     stageId: stages[0] ? String(stages[0].id) : "",
+    roundId: stages[0]?.rounds[0] ? String(stages[0].rounds[0].id) : "",
     homeTeamId: "",
     awayTeamId: "",
     startsAt: "",
@@ -853,20 +1199,23 @@ function MatchesPanel({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const selectedStage = stages.find((s) => s.id === Number(draft.stageId));
+  const availableRounds = selectedStage?.rounds ?? [];
+
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
       const m = await adminCreateMatch(tournamentId, {
-        stageId: Number(draft.stageId),
+        roundId: Number(draft.roundId),
         startsAt: new Date(draft.startsAt).toISOString(),
         homeTeamId: draft.homeTeamId ? Number(draft.homeTeamId) : null,
         awayTeamId: draft.awayTeamId ? Number(draft.awayTeamId) : null,
       });
       onCreated(m);
       setNewOpen(false);
-      setDraft({ stageId: stages[0] ? String(stages[0].id) : "", homeTeamId: "", awayTeamId: "", startsAt: "" });
+      setDraft({ stageId: stages[0] ? String(stages[0].id) : "", roundId: stages[0]?.rounds[0] ? String(stages[0].rounds[0].id) : "", homeTeamId: "", awayTeamId: "", startsAt: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar jogo");
     } finally {
@@ -876,6 +1225,7 @@ function MatchesPanel({
 
   const sorted = [...matches].sort((a, b) => {
     if (a.stage.id !== b.stage.id) return a.stage.id - b.stage.id;
+    if (a.round.number !== b.round.number) return a.round.number - b.round.number;
     return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
   });
 
@@ -899,11 +1249,29 @@ function MatchesPanel({
                   <NativeSelect.Root size="sm" disabled={stages.length === 0}>
                     <NativeSelect.Field
                       value={draft.stageId}
-                      onChange={(e) => setDraft((d) => ({ ...d, stageId: e.target.value }))}
+                      onChange={(e) => {
+                        const stg = stages.find((s) => s.id === Number(e.target.value));
+                        setDraft((d) => ({ ...d, stageId: e.target.value, roundId: stg?.rounds[0] ? String(stg.rounds[0].id) : "" }));
+                      }}
                     >
                       {stages.length === 0 && <option value="">Cadastre uma fase primeiro</option>}
                       {stages.map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>Rodada</Field.Label>
+                  <NativeSelect.Root size="sm" disabled={availableRounds.length === 0}>
+                    <NativeSelect.Field
+                      value={draft.roundId}
+                      onChange={(e) => setDraft((d) => ({ ...d, roundId: e.target.value }))}
+                    >
+                      {availableRounds.length === 0 && <option value="">Cadastre uma rodada primeiro</option>}
+                      {availableRounds.map((r) => (
+                        <option key={r.id} value={r.id}>{ordinalRound(r.number)}</option>
                       ))}
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />
@@ -950,7 +1318,19 @@ function MatchesPanel({
                 </Field.Root>
               </SimpleGrid>
               {error && <Text color="red.500" fontSize="sm" mt={2}>{error}</Text>}
-              <Button type="submit" size="sm" colorPalette="blue" mt={3} loading={submitting} disabled={stages.length === 0}>
+              <Button
+                type="submit"
+                size="sm"
+                colorPalette="blue"
+                mt={3}
+                loading={submitting}
+                disabled={
+                  stages.length === 0 ||
+                  !draft.stageId ||
+                  !draft.roundId ||
+                  !draft.startsAt
+                }
+              >
                 Criar jogo
               </Button>
             </form>
@@ -1210,7 +1590,7 @@ function TournamentDetail({
   const [stages, setStages] = useState<Stage[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [pools, setPools] = useState<AdminPool[]>([]);
-  const [tournamentTeams, setTournamentTeams] = useState<Team[]>([]);
+  const [tournamentTeams, setTournamentTeams] = useState<TournamentTeamEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1286,6 +1666,7 @@ function TournamentDetail({
             isFinished={isFinished}
             onCreated={(s) => setStages((prev) => [...prev, s])}
             onUpdated={(s) => setStages((prev) => prev.map((x) => (x.id === s.id ? s : x)))}
+            onDeleted={(id) => setStages((prev) => prev.filter((x) => x.id !== id))}
           />
         </Tabs.Content>
 
@@ -1302,6 +1683,9 @@ function TournamentDetail({
             onAdded={(t) => setTournamentTeams((prev) => [...prev, t])}
             onRemoved={(id) => setTournamentTeams((prev) => prev.filter((t) => t.id !== id))}
             onCreated={onTeamCreated}
+            onTeamGroupChanged={(entry) =>
+              setTournamentTeams((prev) => prev.map((t) => (t.id === entry.id ? entry : t)))
+            }
           />
         </Tabs.Content>
       </Tabs.Root>
@@ -1314,24 +1698,37 @@ function TournamentDetail({
 // ---------------------------------------------------------------------------
 
 export default function AdminPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && (!user || !user.isAdmin)) {
+      router.replace(user ? "/" : "/login?next=/admin");
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (!user?.isAdmin) return;
     Promise.all([adminListTournaments(), adminListTeams()]).then(([ts, tms]) => {
       setTournaments(ts);
       setTeams(tms);
       if (ts.length > 0) setSelectedId(ts[0].id);
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const selected = tournaments.find((t) => t.id === selectedId) ?? null;
 
   function handleTeamCreated(team: Team) {
     setTeams((prev) => [...prev, team].sort((a, b) => a.name.localeCompare(b.name)));
+  }
+
+  if (authLoading || !user?.isAdmin) {
+    return null;
   }
 
   if (loading) {

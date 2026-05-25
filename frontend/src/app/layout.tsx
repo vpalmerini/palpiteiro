@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Box, Container } from "@chakra-ui/react";
 
 import { AppNav } from "@/components/app-nav";
+import { ClientProviders } from "@/components/client-providers";
 import { Provider } from "@/components/provider";
 import "./globals.css";
 
@@ -15,12 +16,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="pt-BR">
       <body>
         <Provider>
-          <Box as="main" bg="gray.50" color="gray.900" minH="100vh">
-            <Container maxW="6xl" px={{ base: 5, md: 8 }} py={{ base: 6, md: 8 }}>
-              <AppNav />
-              {children}
-            </Container>
-          </Box>
+          <ClientProviders>
+            <Box as="main" bg="bg.subtle" color="fg" minH="100vh" overflowX="hidden">
+              <Container maxW="6xl" px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+                <AppNav />
+                {children}
+              </Container>
+            </Box>
+          </ClientProviders>
         </Provider>
       </body>
     </html>

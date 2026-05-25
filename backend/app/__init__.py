@@ -15,7 +15,11 @@ def create_app(config_object=Config):
 
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app, resources={r"/api/*": {"origins": app.config["FRONTEND_ORIGIN"]}})
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": app.config["FRONTEND_ORIGIN"]}},
+        supports_credentials=True,
+    )
 
     app.register_blueprint(api)
 
