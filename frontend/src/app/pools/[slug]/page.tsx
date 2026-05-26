@@ -30,6 +30,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getMatches, getPool, getPredictions, getPoolSnapshots, getRanking, joinPool, ordinalRound } from "@/lib/api";
+import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { Match, Pool, Prediction, RankingEntry, RoundSnapshot } from "@/types";
 import { useAuth } from "@/contexts/auth";
 
@@ -97,6 +98,12 @@ export default function PoolPage({ params }: PageProps) {
 
     return { chartData: chartPoints, participants: participantsSorted, stageNames: stageNamesSet };
   }, [snapshots]);
+
+  // Map displayName → pictureUrl built from ranking data
+  const pictureMap = useMemo(
+    () => new Map(ranking.map((e) => [e.displayName, e.pictureUrl])),
+    [ranking],
+  );
 
   const LINE_COLORS = [
     "#3182CE", "#E53E3E", "#38A169", "#D69E2E", "#805AD5",
@@ -387,18 +394,60 @@ export default function PoolPage({ params }: PageProps) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     formatter={(value: string) => (value as any).endsWith("_pts") ? null : value}
                   />
-                  {participants.map((p, idx) => (
-                    <Line
-                      key={p.userId}
-                      type="monotone"
-                      dataKey={p.displayName}
-                      stroke={LINE_COLORS[idx % LINE_COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      connectNulls
-                    />
-                  ))}
+                  {participants.map((p, idx) => {
+                    const color = LINE_COLORS[idx % LINE_COLORS.length];
+                    const pic = pictureMap.get(p.displayName) ?? null;
+                    const R = 10;
+
+                    return (
+                      <Line
+                        key={p.userId}
+                        type="monotone"
+                        dataKey={p.displayName}
+                        stroke={color}
+                        strokeWidth={2}
+                        connectNulls
+                        dot={(dotProps) => {
+                          const { cx, cy, index } = dotProps as { cx: number; cy: number; index: number };
+                          const uid = `av-${p.userId}-${index}`;
+                          if (pic) {
+                            return (
+                              <g key={uid}>
+                                <defs>
+                                  <clipPath id={uid}>
+                                    <circle cx={cx} cy={cy} r={R} />
+                                  </clipPath>
+                                </defs>
+                                <circle cx={cx} cy={cy} r={R + 1} fill={color} />
+                                <image href={pic} x={cx - R} y={cy - R} width={R * 2} height={R * 2} clipPath={`url(#${uid})`} />
+                              </g>
+                            );
+                          }
+                          return <circle key={uid} cx={cx} cy={cy} r={R} fill={color} stroke="white" strokeWidth={2} />;
+                        }}
+                        activeDot={(dotProps) => {
+                          const { cx, cy, index } = dotProps as { cx: number; cy: number; index: number };
+                          const uid = `av-a-${p.userId}-${index}`;
+                          const Ra = R + 3;
+                          if (pic) {
+                            return (
+                              <g key={uid}>
+                                <defs>
+                                  <clipPath id={uid}>
+                                    <circle cx={cx} cy={cy} r={Ra} />
+                                  </clipPath>
+                                </defs>
+                                <circle cx={cx} cy={cy} r={Ra + 2} fill={color} opacity={0.4} />
+                                <circle cx={cx} cy={cy} r={Ra + 1} fill={color} />
+                                <image href={pic} x={cx - Ra} y={cy - Ra} width={Ra * 2} height={Ra * 2} clipPath={`url(#${uid})`} />
+                              </g>
+                            );
+                          }
+                          return <circle key={uid} cx={cx} cy={cy} r={Ra} fill={color} stroke="white" strokeWidth={2} />;
+                        }}
+                      />
+                    );
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             </Box>
@@ -411,9 +460,16 @@ export default function PoolPage({ params }: PageProps) {
 
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
-          <Card.Title><HStack gap={2}><CalendarDays size={18} />Próximos jogos</HStack></Card.Title>
+          <HStack justify="space-between" align="center">
+            <Card.Title><HStack gap={2}><CalendarDays size={18} />Próximos jogos</HStack></Card.Title>
+            {matches.length > 6 && (
+              <Button asChild size="xs" variant="ghost" colorPalette="green">
+                <Link href={`/pools/${slug}/predictions`}>Ver todos ({matches.length})</Link>
+              </Button>
+            )}
+          </HStack>
           <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
-            {matches.map((match) => {
+            {matches.slice(0, 6).map((match) => {
               const hasPrediction = predictedMatchIds.has(match.id);
               return (
                 <Card.Root
@@ -424,9 +480,13 @@ export default function PoolPage({ params }: PageProps) {
                   borderWidth={hasPrediction ? "2px" : "1px"}
                 >
                   <Card.Body gap={2} p={3}>
-                    <Text fontWeight="bold" fontSize="sm" lineClamp={2}>
-                      {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
-                    </Text>
+                    <HStack gap={1.5} align="center" wrap="nowrap">
+                      {match.homeTeam && <TeamLogo team={match.homeTeam} size="xs" />}
+                      <Text fontWeight="bold" fontSize="sm" lineClamp={1}>
+                        {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
+                      </Text>
+                      {match.awayTeam && <TeamLogo team={match.awayTeam} size="xs" />}
+                    </HStack>
                     <Text color="fg.muted" fontSize="xs">
                       {match.stage.name}{match.group ? ` · ${match.group.name}` : ""}
                     </Text>

@@ -331,7 +331,23 @@ export function adminRenameGroup(groupId: number, payload: { name: string }) {
   });
 }
 
-export function adminCreateTeam(payload: { name: string; shortName: string; teamType: string }) {
+export function adminUpdateTeam(
+  teamId: number,
+  payload: Partial<{ name: string; shortName: string; flagCode: string; logoUrl: string }>,
+) {
+  return request<Team>(`/admin/teams/${teamId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminCreateTeam(payload: {
+  name: string;
+  shortName: string;
+  teamType: string;
+  flagCode?: string;
+  logoUrl?: string;
+}) {
   return request<Team>("/admin/teams", {
     method: "POST",
     body: JSON.stringify(payload),

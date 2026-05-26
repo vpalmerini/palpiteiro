@@ -22,6 +22,7 @@ import {
   Medal,
   Share2,
   Shuffle,
+  Target,
   TrendingUp,
   Trophy,
   Users,
@@ -53,36 +54,36 @@ function FootballSVG({ size = 80 }: { size?: number }) {
 const FEATURES = [
   {
     icon: TrendingUp,
-    color: "#3182CE",
-    bg: "blue.50",
-    borderColor: "#bee3f8",
+    color: "#276749",
+    bg: "green.50",
+    borderColor: "#c6f6d5",
     title: "Timeline do ranking",
     description:
-      "Gráfico interativo que mostra a evolução de cada participante rodada a rodada. Vire o jogo até o apito final.",
+      "Gráfico interativo que mostra a evolução de cada palpiteiro rodada a rodada. Vire o jogo até o apito final.",
   },
   {
     icon: Shuffle,
-    color: "#38A169",
+    color: "#2F855A",
     bg: "green.50",
-    borderColor: "#c6f6d5",
+    borderColor: "#9ae6b4",
     title: "Vários bolões ao mesmo tempo",
     description:
       "Um pra família, um pro trampo, um pros amigos — participe de quantos quiser com a mesma conta.",
   },
   {
     icon: Medal,
-    color: "#D69E2E",
-    bg: "yellow.50",
-    borderColor: "#fefcbf",
+    color: "#22543D",
+    bg: "green.50",
+    borderColor: "#c6f6d5",
     title: "Palpites especiais",
     description:
       "Além dos placares, aposte no campeão, vice, artilheiro e melhor jogador. Cada acerto vale pontos extras.",
   },
   {
     icon: Link2,
-    color: "#805AD5",
-    bg: "purple.50",
-    borderColor: "#e9d8fd",
+    color: "#38A169",
+    bg: "green.50",
+    borderColor: "#9ae6b4",
     title: "Convite por link",
     description:
       "Cada bolão tem um link único. Compartilhe onde quiser — qualquer pessoa entra com um clique.",
@@ -169,11 +170,11 @@ export default function Home() {
             fontWeight="bold"
             letterSpacing="widest"
             textTransform="uppercase"
-            style={{ background: "rgba(255,255,255,0.1)", color: "#90cdf4", border: "1px solid rgba(144,205,244,0.3)" }}
+            style={{ background: "rgba(255,255,255,0.1)", color: "#9ae6b4", border: "1px solid rgba(154,230,180,0.35)" }}
           >
             <HStack gap={1.5}>
-              <span>⚽</span>
-              <span>Bolão da Copa</span>
+              <Target size={12} color="#68d391" />
+              <span>Palpiteiro</span>
             </HStack>
           </Badge>
 
@@ -186,7 +187,7 @@ export default function Home() {
             color="white"
             maxW="4xl"
           >
-            Seu bolão,{" "}
+            Palpite.{" "}
             <Box
               as="span"
               style={{
@@ -196,7 +197,7 @@ export default function Home() {
                 backgroundClip: "text",
               }}
             >
-              do seu jeito.
+              Compete. Vença.
             </Box>
           </Heading>
 
@@ -206,8 +207,8 @@ export default function Home() {
             lineHeight="relaxed"
             style={{ color: "rgba(255,255,255,0.65)" }}
           >
-            Crie bolões com regras personalizadas, convide amigos por link e acompanhe
-            quem vai virar o jogo até o último apito.
+            Crie bolões personalizados, convide a galera por link e prove quem é
+            o melhor palpiteiro do grupo — rodada após rodada.
           </Text>
 
           <HStack gap={3} flexWrap="wrap" justify="center">
@@ -265,9 +266,9 @@ export default function Home() {
             >
               <HStack justify="space-between">
                 <HStack gap={2}>
-                  <Trophy size={14} color="#68d391" />
+                  <Target size={14} color="#68d391" />
                   <Text color="white" fontWeight="bold" fontSize="sm" letterSpacing="wide">
-                    RANKING · SEMIFINAIS
+                    PALPITEIRO · SEMIFINAIS
                   </Text>
                 </HStack>
                 <HStack gap={1.5}>
@@ -360,10 +361,10 @@ export default function Home() {
       <Stack gap={10} py={{ base: 12, md: 20 }}>
         <Stack gap={2} textAlign="center">
           <Text fontSize="sm" fontWeight="bold" color="green.600" textTransform="uppercase" letterSpacing="widest">
-            Por que usar
+            Por que Palpiteiro
           </Text>
           <Heading as="h2" fontSize={{ base: "3xl", md: "4xl" }} fontWeight="black" letterSpacing="-0.02em">
-            Feito pra quem leva o bolão a sério.
+            Feito para palpiteiros de verdade.
           </Heading>
         </Stack>
 
@@ -446,7 +447,7 @@ export default function Home() {
               Como funciona
             </Text>
             <Heading as="h2" fontSize={{ base: "3xl", md: "4xl" }} fontWeight="black" color="white" letterSpacing="-0.02em">
-              Três passos e o bolão tá feito.
+              Três passos e você está no jogo.
             </Heading>
           </Stack>
 
@@ -489,7 +490,17 @@ export default function Home() {
 
       {/* ── Bottom CTA ───────────────────────────────────────────────────────── */}
       <Stack gap={6} py={{ base: 14, md: 20 }} align="center" textAlign="center">
-        <Text fontSize="5xl">⚽</Text>
+        <Box
+          w={16}
+          h={16}
+          rounded="2xl"
+          bg="green.600"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Target size={32} color="white" strokeWidth={2.5} />
+        </Box>
 
         <HStack gap={2} flexWrap="wrap" justify="center">
           {[
@@ -523,7 +534,7 @@ export default function Home() {
           maxW="lg"
           lineHeight="1.05"
         >
-          Quem vai{" "}
+          Quem vai ser o{" "}
           <Box
             as="span"
             style={{
@@ -533,12 +544,12 @@ export default function Home() {
               backgroundClip: "text",
             }}
           >
-            cravar o placar?
+            palpiteiro do grupo?
           </Box>
         </Heading>
 
         <Text color="fg.muted" fontSize="lg" maxW="md" lineHeight="relaxed">
-          Crie seu bolão agora e descubra quem manja mais de futebol no seu grupo.
+          Crie seu bolão no Palpiteiro e descubra quem manja mais de futebol.
         </Text>
 
         <Button

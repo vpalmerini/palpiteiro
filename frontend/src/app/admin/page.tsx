@@ -47,6 +47,7 @@ import {
   adminUpdateMatch,
   adminUpdateRound,
   adminUpdateStage,
+  adminUpdateTeam,
   adminUpdateTournamentAwards,
   adminUpdateTournamentStatus,
   ordinalRound,
@@ -186,8 +187,15 @@ function TournamentTeamsPanel({
   const [name, setName] = useState("");
   const [shortName, setShortName] = useState("");
   const [teamType, setTeamType] = useState("national");
+  const [flagCode, setFlagCode] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
+
+  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [editFlagCode, setEditFlagCode] = useState("");
+  const [editLogoUrl, setEditLogoUrl] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   const [availableGroups, setAvailableGroups] = useState<TournamentGroup[]>([]);
 
@@ -238,17 +246,45 @@ function TournamentTeamsPanel({
     setCreateError(null);
     setCreateLoading(true);
     try {
-      const t = await adminCreateTeam({ name: name.trim(), shortName: shortName.trim().toUpperCase(), teamType });
+      const t = await adminCreateTeam({
+        name: name.trim(),
+        shortName: shortName.trim().toUpperCase(),
+        teamType,
+        flagCode: flagCode.trim().toUpperCase() || undefined,
+        logoUrl: logoUrl.trim() || undefined,
+      });
       onCreated(t);
       await adminAddTournamentTeam(tournamentId, t.id);
       onAdded({ ...t, groupId: null, groupName: null });
       setName("");
       setShortName("");
       setTeamType("national");
+      setFlagCode("");
+      setLogoUrl("");
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Erro ao criar time");
     } finally {
       setCreateLoading(false);
+    }
+  }
+
+  function startEdit(t: TournamentTeamEntry) {
+    setEditingTeamId(t.id);
+    setEditFlagCode(t.flagCode ?? "");
+    setEditLogoUrl(t.logoUrl ?? "");
+  }
+
+  async function saveEdit(teamId: number) {
+    setEditLoading(true);
+    try {
+      const updated = await adminUpdateTeam(teamId, {
+        flagCode: editFlagCode.trim().toUpperCase() || undefined,
+        logoUrl: editLogoUrl.trim() || undefined,
+      });
+      onCreated(updated); // reuse to sync allTeams list
+      setEditingTeamId(null);
+    } finally {
+      setEditLoading(false);
     }
   }
 
@@ -266,21 +302,46 @@ function TournamentTeamsPanel({
               <Table.ColumnHeader>Nome</Table.ColumnHeader>
               <Table.ColumnHeader>Sigla</Table.ColumnHeader>
               <Table.ColumnHeader>Tipo</Table.ColumnHeader>
+              <Table.ColumnHeader>Bandeira / Logo</Table.ColumnHeader>
               <Table.ColumnHeader>Grupo</Table.ColumnHeader>
               <Table.ColumnHeader />
             </Table.Row>
           </Table.Header>
           <Table.Body>
             {tournamentTeams.map((t) => {
+              const isEditing = editingTeamId === t.id;
               return (
-                <Table.Row key={t.id}>
-                  <Table.Cell>{t.name}</Table.Cell>
-                  <Table.Cell>{t.shortName ? <Badge variant="subtle">{t.shortName}</Badge> : <Text color="gray.400" fontSize="xs">—</Text>}</Table.Cell>
-                  <Table.Cell>
-                    <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
-                      {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
-                    </Badge>
-                  </Table.Cell>
+                <>
+                  <Table.Row key={t.id}>
+                    <Table.Cell>{t.name}</Table.Cell>
+                    <Table.Cell>{t.shortName ? <Badge variant="subtle">{t.shortName}</Badge> : <Text color="gray.400" fontSize="xs">—</Text>}</Table.Cell>
+                    <Table.Cell>
+                      <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
+                        {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        {t.flagCode && (
+                          <Text fontSize="lg" title={`Código: ${t.flagCode}`}>
+                            {[...t.flagCode.toUpperCase()].map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join("")}
+                          </Text>
+                        )}
+                        {t.logoUrl && (
+                          <img
+                            src={t.logoUrl}
+                            alt={t.name}
+                            width={20}
+                            height={20}
+                            style={{ objectFit: "contain" }}
+                          />
+                        )}
+                        {!t.flagCode && !t.logoUrl && <Text color="gray.400" fontSize="xs">—</Text>}
+                        <Button size="xs" variant="ghost" onClick={() => isEditing ? setEditingTeamId(null) : startEdit(t)}>
+                          {isEditing ? "Cancelar" : "Editar"}
+                        </Button>
+                      </HStack>
+                    </Table.Cell>
                   <Table.Cell>
                     {allGroups.length > 0 ? (
                       <NativeSelect.Root size="xs" minW="120px" disabled={isFinished}>
@@ -303,18 +364,30 @@ function TournamentTeamsPanel({
                       <Text color="gray.400" fontSize="xs">—</Text>
                     )}
                   </Table.Cell>
-                  <Table.Cell>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorPalette="red"
-                      disabled={isFinished}
-                      onClick={() => handleRemove(t.id)}
-                    >
-                      Remover
-                    </Button>
-                  </Table.Cell>
-                </Table.Row>
+                    <Table.Cell>
+                      <Button size="xs" variant="ghost" colorPalette="red" disabled={isFinished} onClick={() => handleRemove(t.id)}>
+                        Remover
+                      </Button>
+                    </Table.Cell>
+                  </Table.Row>
+                  {isEditing && (
+                    <Table.Row key={`${t.id}-edit`} bg="bg.subtle">
+                      <Table.Cell colSpan={6}>
+                        <HStack gap={3} py={1} flexWrap="wrap">
+                          <Field.Root maxW="140px">
+                            <Field.Label fontSize="xs">Código ISO (ex: BR)</Field.Label>
+                            <Input size="xs" maxLength={2} value={editFlagCode} onChange={(e) => setEditFlagCode(e.target.value.toUpperCase())} placeholder="BR" />
+                          </Field.Root>
+                          <Field.Root flex={1} minW="200px">
+                            <Field.Label fontSize="xs">URL do escudo/logo</Field.Label>
+                            <Input size="xs" value={editLogoUrl} onChange={(e) => setEditLogoUrl(e.target.value)} placeholder="https://..." />
+                          </Field.Root>
+                          <Button size="xs" colorPalette="green" loading={editLoading} onClick={() => saveEdit(t.id)}>Salvar</Button>
+                        </HStack>
+                      </Table.Cell>
+                    </Table.Row>
+                  )}
+                </>
               );
             })}
           </Table.Body>
@@ -396,6 +469,31 @@ function TournamentTeamsPanel({
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>
+                      Código da bandeira{" "}
+                      <Text as="span" color="gray.400" fontWeight="normal">(ISO, ex: BR)</Text>
+                    </Field.Label>
+                    <Input
+                      size="sm"
+                      placeholder="BR"
+                      maxLength={2}
+                      value={flagCode}
+                      onChange={(e) => setFlagCode(e.target.value.toUpperCase())}
+                    />
+                  </Field.Root>
+                  <Field.Root gridColumn={{ md: "span 2" }}>
+                    <Field.Label>
+                      URL do escudo/logo{" "}
+                      <Text as="span" color="gray.400" fontWeight="normal">(opcional, substitui bandeira)</Text>
+                    </Field.Label>
+                    <Input
+                      size="sm"
+                      placeholder="https://..."
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                    />
                   </Field.Root>
                 </SimpleGrid>
                 {createError && <Text color="red.500" fontSize="sm" mt={2}>{createError}</Text>}

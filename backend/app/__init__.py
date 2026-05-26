@@ -37,7 +37,7 @@ def create_app(config_object=Config):
 
     @app.cli.command("seed-db")
     def seed_db():
-        from .routes import seed_database
+        from .seed_data import seed_database
 
         print(seed_database())
 

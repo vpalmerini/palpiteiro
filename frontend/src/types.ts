@@ -60,6 +60,8 @@ export type Team = {
   name: string;
   shortName: string | null;
   teamType: TeamType;
+  flagCode: string | null;   // ISO 3166-1 alpha-2, e.g. "BR" — national teams
+  logoUrl: string | null;    // absolute URL to crest/flag image — clubs or custom
 };
 
 export type Round = {
@@ -113,6 +115,7 @@ export type RankingEntry = {
   position: number;
   displayName: string;
   userId: string;
+  pictureUrl: string | null;
   points: number;
   exactScores: number;
   outcomeHits: number;

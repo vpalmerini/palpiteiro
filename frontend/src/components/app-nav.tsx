@@ -1,11 +1,12 @@
 "use client";
 
 import { Avatar, Box, Button, Flex, HStack, MenuContent, MenuItem, MenuRoot, MenuTrigger, Text } from "@chakra-ui/react";
-import { LayoutDashboard, LogIn, LogOut, Plus, Trophy, Tv2 } from "lucide-react";
+import { LayoutDashboard, LogIn, LogOut, Plus, Tv2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth";
 import { ColorModeButton } from "@/components/color-mode";
+import { BrandLogo } from "@/components/brand-logo";
 
 export function AppNav() {
   const pathname = usePathname();
@@ -21,11 +22,8 @@ export function AppNav() {
   return (
     <Flex as="nav" align="center" justify="space-between" mb={6}>
       {/* Logo */}
-      <Link href="/" style={{ fontWeight: 800, flexShrink: 0 }}>
-        <HStack gap={2}>
-          <Trophy size={20} />
-          <Text fontWeight={800} display={{ base: "none", sm: "block" }}>Bolão da Copa</Text>
-        </HStack>
+      <Link href="/" style={{ flexShrink: 0 }}>
+        <BrandLogo size="sm" responsiveText />
       </Link>
 
       {/* Desktop nav */}

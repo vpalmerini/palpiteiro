@@ -22,6 +22,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
 import { getAwardPrediction, getMatches, getPool, getPredictions, listTournamentTeams, ordinalRound, saveAwardPrediction, savePrediction } from "@/lib/api";
+import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
 import { useAuth } from "@/contexts/auth";
 import { useRouter } from "next/navigation";
@@ -523,9 +524,13 @@ export default function PredictionsPage({ params }: PageProps) {
             >
               <Card.Body gap={3} p={{ base: 3, md: 4 }}>
                 <Stack gap={2}>
-                  <Heading as="h2" fontSize={{ base: "md", md: "xl" }} fontWeight="bold" lineHeight="short">
-                    {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
-                  </Heading>
+                  <HStack gap={2} align="center" wrap="wrap">
+                    {match.homeTeam && <TeamLogo team={match.homeTeam} size="sm" />}
+                    <Heading as="h2" fontSize={{ base: "md", md: "xl" }} fontWeight="bold" lineHeight="short">
+                      {match.homeTeam?.name ?? "A definir"} x {match.awayTeam?.name ?? "A definir"}
+                    </Heading>
+                    {match.awayTeam && <TeamLogo team={match.awayTeam} size="sm" />}
+                  </HStack>
                   <Stack direction="row" align="center" flexWrap="wrap" gap={2}>
                     <Badge
                       colorPalette={match.isLocked ? "red" : "green"}
@@ -598,9 +603,12 @@ export default function PredictionsPage({ params }: PageProps) {
                     <HStack gap={0} justify="center" align="center">
                       {/* Home team stepper */}
                       <Stack flex={1} align="center" gap={1} minW={0}>
-                        <Text fontSize="xs" fontWeight="semibold" color="fg.muted" textAlign="center" truncate maxW="full" px={1}>
-                          {match.homeTeam?.name ?? "Mandante"}
-                        </Text>
+                        <HStack gap={1} justify="center">
+                          {match.homeTeam && <TeamLogo team={match.homeTeam} size="xs" />}
+                          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" truncate maxW="full">
+                            {match.homeTeam?.shortName ?? match.homeTeam?.name ?? "Mandante"}
+                          </Text>
+                        </HStack>
                         <HStack gap={0} rounded="xl" overflow="hidden" borderWidth="1px" borderColor="border">
                           <Button
                             type="button"
@@ -649,9 +657,12 @@ export default function PredictionsPage({ params }: PageProps) {
 
                       {/* Away team stepper */}
                       <Stack flex={1} align="center" gap={1} minW={0}>
-                        <Text fontSize="xs" fontWeight="semibold" color="fg.muted" textAlign="center" truncate maxW="full" px={1}>
-                          {match.awayTeam?.name ?? "Visitante"}
-                        </Text>
+                        <HStack gap={1} justify="center">
+                          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" truncate maxW="full">
+                            {match.awayTeam?.shortName ?? match.awayTeam?.name ?? "Visitante"}
+                          </Text>
+                          {match.awayTeam && <TeamLogo team={match.awayTeam} size="xs" />}
+                        </HStack>
                         <HStack gap={0} rounded="xl" overflow="hidden" borderWidth="1px" borderColor="border">
                           <Button
                             type="button"

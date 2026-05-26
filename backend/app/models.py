@@ -78,6 +78,10 @@ class Team(db.Model):
     name = db.Column(db.String(120), nullable=False)
     short_name = db.Column(db.String(12), nullable=True)
     team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
+    # flag_code: ISO 3166-1 alpha-2 (e.g. "BR", "AR") — used for national team flag emoji
+    flag_code = db.Column(db.String(2), nullable=True)
+    # logo_url: absolute URL to crest/flag image — overrides flag_code when present
+    logo_url = db.Column(db.String(500), nullable=True)
 
 
 class TournamentGroup(db.Model):

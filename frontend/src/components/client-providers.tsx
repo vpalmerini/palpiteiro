@@ -9,7 +9,7 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <ColorModeProvider>
-      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID} locale="pt-BR">
         <AuthProvider>{children}</AuthProvider>
       </GoogleOAuthProvider>
     </ColorModeProvider>

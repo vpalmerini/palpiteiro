@@ -7,8 +7,8 @@ import { Provider } from "@/components/provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bolão da Copa",
-  description: "MVP para criar e participar de bolões de futebol.",
+  title: "Palpiteiro",
+  description: "Crie bolões, faça seus palpites e dispute o ranking com amigos.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

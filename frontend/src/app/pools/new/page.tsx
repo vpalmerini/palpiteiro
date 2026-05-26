@@ -166,7 +166,7 @@ export default function NewPoolPage() {
             </Field.Root>
             <Field.Root required>
               <Field.Label>Nome do bolão</Field.Label>
-              <Input name="name" placeholder="Bolão da firma" />
+              <Input name="name" placeholder="Palpiteiros do escritório" />
             </Field.Root>
             <Field.Root>
               <Field.Label>Nickname</Field.Label>
