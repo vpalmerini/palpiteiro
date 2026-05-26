@@ -6,5 +6,6 @@ psycopg[binary]
 python-dotenv
 pytest
 google-auth
+requests
 PyJWT
 gunicorn
