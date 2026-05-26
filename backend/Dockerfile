@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 5001
 
-CMD ["flask", "--app", "run", "run", "--host=0.0.0.0", "--port=5001"]
+CMD ["sh", "-c", "gunicorn 'run:app' --bind 0.0.0.0:${PORT:-5001}"]
