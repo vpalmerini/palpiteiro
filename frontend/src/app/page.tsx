@@ -197,7 +197,7 @@ export default function Home() {
                 backgroundClip: "text",
               }}
             >
-              Compete. Vença.
+              Pontue. Vença.
             </Box>
           </Heading>
 
