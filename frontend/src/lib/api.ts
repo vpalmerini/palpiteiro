@@ -175,7 +175,7 @@ export function saveAwardPrediction(
     bestPlayer?: string;
   },
 ) {
-  return request<AwardPrediction>(`/pools/${slug}/award-prediction`, {
+  return request<void>(`/pools/${slug}/award-prediction`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

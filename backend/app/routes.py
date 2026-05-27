@@ -1556,7 +1556,7 @@ def upsert_award_prediction(slug):
     if pool.predict_best_player:
         award_pred.best_player = (data.get("bestPlayer") or "").strip() or None
     db.session.commit()
-    return jsonify(_award_prediction_payload(award_pred))
+    return "", 204
 
 
 @api.patch("/admin/tournaments/<uuid:tournament_id>/awards")

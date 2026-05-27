@@ -131,14 +131,13 @@ export default function PredictionsPage({ params }: PageProps) {
     setAwardMessage("Salvando palpites especiais…");
 
     try {
-      const saved = await saveAwardPrediction(slug, {
+      await saveAwardPrediction(slug, {
         championTeamId: awardDraft.championTeamId || null,
         runnerUpTeamId: awardDraft.runnerUpTeamId || null,
         thirdPlaceTeamId: awardDraft.thirdPlaceTeamId || null,
         topScorer: awardDraft.topScorer,
         bestPlayer: awardDraft.bestPlayer,
       });
-      setSavedAwardPrediction(saved);
       setAwardMessage("Palpites especiais salvos.");
     } catch (err) {
       setSavedAwardPrediction(previous);
