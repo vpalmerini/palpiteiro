@@ -3,19 +3,35 @@
 import {
   Avatar,
   Button,
+  Drawer,
   Flex,
   HStack,
+  IconButton,
   MenuContent,
   MenuItem,
   MenuRoot,
   MenuTrigger,
+  Separator,
+  Stack,
   Text,
 } from "@chakra-ui/react";
-import { LayoutDashboard, LogIn, LogOut, Plus, Tv2 } from "lucide-react";
+import {
+  Home,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  Moon,
+  Plus,
+  Sun,
+  Tv2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 import { useAuth } from "@/contexts/auth";
-import { ColorModeButton } from "@/components/color-mode";
+import { ColorModeButton, useColorMode } from "@/components/color-mode";
 import { BrandLogo } from "@/components/brand-logo";
 import type { User } from "@/types";
 
@@ -61,6 +77,201 @@ function UserAccountMenu({ user, onSignOut }: { user: User; onSignOut: () => voi
   );
 }
 
+function DrawerNavLink({
+  href,
+  icon,
+  label,
+  active,
+  onNavigate,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <Button
+      asChild
+      variant={active ? "subtle" : "ghost"}
+      colorPalette={active ? "green" : "gray"}
+      justifyContent="flex-start"
+      w="full"
+      size="lg"
+      rounded="lg"
+      onClick={onNavigate}
+    >
+      <Link href={href}>
+        <HStack gap={3} w="full">
+          {icon}
+          <span>{label}</span>
+        </HStack>
+      </Link>
+    </Button>
+  );
+}
+
+function MobileNavDrawer({
+  user,
+  loading,
+  showCreateButton,
+  onSignOut,
+}: {
+  user: User | null;
+  loading: boolean;
+  showCreateButton: boolean;
+  onSignOut: () => void;
+}) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const { colorMode, toggleColorMode } = useColorMode();
+
+  function close() {
+    setOpen(false);
+  }
+
+  async function handleSignOut() {
+    close();
+    await onSignOut();
+  }
+
+  function isActive(href: string) {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  return (
+    <Drawer.Root open={open} onOpenChange={(details) => setOpen(details.open)} placement="end" size="sm">
+      <Drawer.Trigger asChild>
+        <IconButton variant="ghost" size="sm" rounded="lg" aria-label="Abrir menu">
+          <Menu size={20} />
+        </IconButton>
+      </Drawer.Trigger>
+
+      <Drawer.Backdrop />
+      <Drawer.Positioner>
+        <Drawer.Content>
+          <Drawer.Header borderBottomWidth="1px">
+            <Drawer.Title>Menu</Drawer.Title>
+            <Drawer.CloseTrigger asChild position="absolute" top={3} right={3}>
+              <IconButton variant="ghost" size="sm" rounded="lg" aria-label="Fechar menu">
+                <X size={18} />
+              </IconButton>
+            </Drawer.CloseTrigger>
+          </Drawer.Header>
+
+          <Drawer.Body py={4}>
+            <Stack gap={2}>
+              {!loading && user && (
+                <HStack gap={3} px={2} py={3} mb={2} rounded="lg" bg="bg.muted">
+                  <Avatar.Root size="md">
+                    {user.pictureUrl ? (
+                      <Avatar.Image src={user.pictureUrl} alt={user.name} />
+                    ) : (
+                      <Avatar.Fallback>{user.name?.charAt(0)?.toUpperCase() ?? "?"}</Avatar.Fallback>
+                    )}
+                  </Avatar.Root>
+                  <Stack gap={0} minW={0}>
+                    <Text fontWeight="semibold" fontSize="sm" truncate>
+                      {user.name}
+                    </Text>
+                    <Text color="fg.muted" fontSize="xs" truncate>
+                      {user.email}
+                    </Text>
+                  </Stack>
+                </HStack>
+              )}
+
+              <DrawerNavLink
+                href="/"
+                icon={<Home size={18} />}
+                label="Início"
+                active={isActive("/")}
+                onNavigate={close}
+              />
+
+              {!loading && user && (
+                <>
+                  <DrawerNavLink
+                    href="/meus-boloes"
+                    icon={<Tv2 size={18} />}
+                    label="Meus Bolões"
+                    active={isActive("/meus-boloes")}
+                    onNavigate={close}
+                  />
+                  {user.isAdmin && (
+                    <DrawerNavLink
+                      href="/admin"
+                      icon={<LayoutDashboard size={18} />}
+                      label="Admin"
+                      active={isActive("/admin")}
+                      onNavigate={close}
+                    />
+                  )}
+                  {showCreateButton && (
+                    <DrawerNavLink
+                      href="/pools/new"
+                      icon={<Plus size={18} />}
+                      label="Criar bolão"
+                      active={isActive("/pools/new")}
+                      onNavigate={close}
+                    />
+                  )}
+                </>
+              )}
+
+              <Separator my={2} />
+
+              <Button
+                variant="ghost"
+                colorPalette="gray"
+                justifyContent="flex-start"
+                w="full"
+                size="lg"
+                rounded="lg"
+                onClick={toggleColorMode}
+              >
+                <HStack gap={3}>
+                  {colorMode === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                  <span>{colorMode === "dark" ? "Modo claro" : "Modo escuro"}</span>
+                </HStack>
+              </Button>
+
+              {!loading && !user && (
+                <DrawerNavLink
+                  href="/login"
+                  icon={<LogIn size={18} />}
+                  label="Entrar"
+                  active={isActive("/login")}
+                  onNavigate={close}
+                />
+              )}
+            </Stack>
+          </Drawer.Body>
+
+          {!loading && user && (
+            <Drawer.Footer borderTopWidth="1px">
+              <Button
+                variant="outline"
+                colorPalette="red"
+                w="full"
+                size="lg"
+                rounded="lg"
+                onClick={handleSignOut}
+              >
+                <HStack gap={2}>
+                  <LogOut size={16} />
+                  <span>Sair</span>
+                </HStack>
+              </Button>
+            </Drawer.Footer>
+          )}
+        </Drawer.Content>
+      </Drawer.Positioner>
+    </Drawer.Root>
+  );
+}
+
 export function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -71,21 +282,6 @@ export function AppNav() {
     await signOut();
     router.push("/login");
   }
-
-  const authControl = !loading && (
-    user ? (
-      <UserAccountMenu user={user} onSignOut={handleSignOut} />
-    ) : (
-      <Button asChild colorPalette="green" variant="subtle" rounded="lg" size="sm">
-        <Link href="/login">
-          <HStack gap={1}>
-            <LogIn size={14} />
-            <Text display={{ base: "none", sm: "inline" }}>Entrar</Text>
-          </HStack>
-        </Link>
-      </Button>
-    )
-  );
 
   return (
     <Flex as="nav" align="center" justify="space-between" mb={6}>
@@ -128,36 +324,29 @@ export function AppNav() {
             )}
           </>
         )}
-        {authControl}
+        {!loading &&
+          (user ? (
+            <UserAccountMenu user={user} onSignOut={handleSignOut} />
+          ) : (
+            <Button asChild colorPalette="green" variant="subtle" rounded="lg" size="sm">
+              <Link href="/login">
+                <HStack gap={1}>
+                  <LogIn size={14} />
+                  <span>Entrar</span>
+                </HStack>
+              </Link>
+            </Button>
+          ))}
       </Flex>
 
       {/* Mobile nav */}
-      <Flex align="center" gap={1} display={{ base: "flex", sm: "none" }}>
-        <ColorModeButton />
-        {user && (
-          <>
-            <Button asChild colorPalette="gray" variant="ghost" rounded="lg" size="sm" aria-label="Meus Bolões">
-              <Link href="/meus-boloes">
-                <Tv2 size={18} />
-              </Link>
-            </Button>
-            {user.isAdmin && (
-              <Button asChild colorPalette="gray" variant="ghost" rounded="lg" size="sm" aria-label="Admin">
-                <Link href="/admin">
-                  <LayoutDashboard size={18} />
-                </Link>
-              </Button>
-            )}
-            {showCreateButton && (
-              <Button asChild colorPalette="green" variant="subtle" rounded="lg" size="sm" aria-label="Criar bolão">
-                <Link href="/pools/new">
-                  <Plus size={18} />
-                </Link>
-              </Button>
-            )}
-          </>
-        )}
-        {authControl}
+      <Flex align="center" display={{ base: "flex", sm: "none" }}>
+        <MobileNavDrawer
+          user={user}
+          loading={loading}
+          showCreateButton={showCreateButton}
+          onSignOut={handleSignOut}
+        />
       </Flex>
     </Flex>
   );
