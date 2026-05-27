@@ -5,7 +5,7 @@ from secrets import token_urlsafe
 
 from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy import func
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import contains_eager, joinedload, load_only, selectinload
 
 from .auth import (
     COOKIE_NAME,
@@ -202,8 +202,9 @@ def _pool_payload(pool: Pool):
     }
 
 
-def _prediction_payload(prediction: Prediction):
-    score = ScoreEntry.active().filter_by(prediction_id=prediction.id).first()
+def _prediction_payload(prediction: Prediction, score: ScoreEntry | None = None):
+    if score is None:
+        score = ScoreEntry.active().filter_by(prediction_id=prediction.id).first()
     return {
         "id": prediction.id,
         "matchId": prediction.match_id,
@@ -242,18 +243,33 @@ def _recalculate_scores(pool: Pool):
     if not finished_match_ids:
         return
 
-    predictions = Prediction.active().filter(
-        Prediction.pool_id == pool.id,
-        Prediction.match_id.in_(finished_match_ids),
-        Prediction.deleted_at.is_(None),
-    ).all()
+    predictions = (
+        Prediction.active()
+        .filter(
+            Prediction.pool_id == pool.id,
+            Prediction.match_id.in_(finished_match_ids),
+            Prediction.deleted_at.is_(None),
+        )
+        .options(joinedload(Prediction.match))
+        .all()
+    )
+    if not predictions:
+        return
+
+    existing_entries = {
+        entry.prediction_id: entry
+        for entry in ScoreEntry.active().filter(
+            ScoreEntry.prediction_id.in_([p.id for p in predictions])
+        ).all()
+    }
 
     for prediction in predictions:
         score = calculate_prediction_score(prediction, prediction.match, pool)
-        entry = ScoreEntry.active().filter_by(prediction_id=prediction.id).first()
+        entry = existing_entries.get(prediction.id)
         if entry is None:
             entry = ScoreEntry(prediction_id=prediction.id, points=score.points)
             db.session.add(entry)
+            existing_entries[prediction.id] = entry
         entry.points = score.points
         entry.exact_score = score.exact_score
         entry.outcome_hit = score.outcome_hit
@@ -452,9 +468,15 @@ def join_pool(slug):
 def list_matches(slug):
     pool = _pool_or_404(slug)
     matches = (
-        Match.active().filter_by(tournament_id=pool.tournament_id)
-        .join(Round)
+        Match.active()
+        .filter_by(tournament_id=pool.tournament_id)
+        .join(Round, Match.round_id == Round.id)
         .join(Stage, Stage.id == Round.stage_id)
+        .options(
+            contains_eager(Match.round).contains_eager(Round.stage),
+            joinedload(Match.home_team),
+            joinedload(Match.away_team),
+        )
         .order_by(Stage.order, Round.number, Match.starts_at)
         .all()
     )
@@ -467,8 +489,22 @@ def list_matches(slug):
 def list_predictions(slug):
     pool = _pool_or_404(slug)
     user: User = g.current_user
-    predictions = Prediction.active().filter_by(pool_id=pool.id, user_id=user.id).all()
-    return jsonify([_prediction_payload(p) for p in predictions])
+    predictions = (
+        Prediction.active()
+        .filter_by(pool_id=pool.id, user_id=user.id)
+        .options(joinedload(Prediction.user))
+        .all()
+    )
+    if not predictions:
+        return jsonify([])
+
+    scores_by_prediction = {
+        entry.prediction_id: entry
+        for entry in ScoreEntry.active().filter(
+            ScoreEntry.prediction_id.in_([p.id for p in predictions])
+        ).all()
+    }
+    return jsonify([_prediction_payload(p, scores_by_prediction.get(p.id)) for p in predictions])
 
 
 @api.post("/pools/<slug>/predictions")
@@ -571,14 +607,22 @@ def get_my_pools():
 def get_ranking(slug):
     pool = _pool_or_404(slug)
     _ensure_creator_membership(pool)
-    entries = _build_ranking(pool)
+    entries = _build_ranking(pool, recalculate=False)
     db.session.commit()
     return jsonify([{k: v for k, v in e.items()} for e in entries])
 
 
-def _build_ranking(pool: Pool) -> list[dict]:
-    """Return sorted ranking entries for a pool (recalculates scores first)."""
-    _recalculate_scores(pool)
+def _build_ranking(pool: Pool, *, recalculate: bool = False) -> list[dict]:
+    """Return sorted ranking entries for a pool."""
+    if recalculate:
+        _recalculate_scores(pool)
+
+    award_by_user = {
+        ap.user_id: ap
+        for ap in AwardPrediction.active().filter_by(pool_id=pool.id).all()
+    }
+    tournament = pool.tournament
+
     rows = (
         db.session.query(
             PoolParticipant.display_name,
@@ -615,7 +659,12 @@ def _build_ranking(pool: Pool) -> list[dict]:
     )
     entries = []
     for row in rows:
-        award_pts = _calculate_award_points(pool, row.user_id)
+        award_pts = _calculate_award_points(
+            pool,
+            row.user_id,
+            award_pred=award_by_user.get(row.user_id),
+            tournament=tournament,
+        )
         entries.append({
             "userId": row.user_id,
             "displayName": row.display_name,
@@ -640,7 +689,7 @@ def generate_round_snapshot(round_id):
     pools = Pool.active().filter_by(tournament_id=tournament.id).all()
 
     for pool in pools:
-        ranking = _build_ranking(pool)
+        ranking = _build_ranking(pool, recalculate=True)
 
         snapshot = RoundSnapshot.active().filter_by(round_id=round_.id, pool_id=pool.id).first()
         if snapshot is None:
@@ -662,7 +711,7 @@ def _snapshot_payload(snapshot: RoundSnapshot) -> dict:
     round_ = snapshot.round
     stage = round_.stage
     entries = sorted(
-        RoundSnapshotEntry.active().filter_by(snapshot_id=snapshot.id).all(),
+        [e for e in snapshot.entries if e.deleted_at is None],
         key=lambda e: e.position,
     )
     return {
@@ -694,9 +743,14 @@ def _snapshot_payload(snapshot: RoundSnapshot) -> dict:
 def list_pool_snapshots(slug):
     pool = _pool_or_404(slug)
     snapshots = (
-        RoundSnapshot.active().filter_by(pool_id=pool.id)
-        .join(Round)
+        RoundSnapshot.active()
+        .filter_by(pool_id=pool.id)
+        .join(Round, RoundSnapshot.round_id == Round.id)
         .join(Stage, Stage.id == Round.stage_id)
+        .options(
+            contains_eager(RoundSnapshot.round).contains_eager(Round.stage),
+            selectinload(RoundSnapshot.entries).joinedload(RoundSnapshotEntry.user),
+        )
         .order_by(Stage.order, Round.number)
         .all()
     )
@@ -776,9 +830,16 @@ def _assert_tournament_editable(tournament: Tournament):
         abort(403, description="O torneio está encerrado e não pode ser editado")
 
 
-def _calculate_award_points(pool: Pool, user_id: str) -> int:
-    tournament = pool.tournament
-    award_pred = AwardPrediction.active().filter_by(pool_id=pool.id, user_id=user_id).first()
+def _calculate_award_points(
+    pool: Pool,
+    user_id: str,
+    *,
+    award_pred: AwardPrediction | None = None,
+    tournament: Tournament | None = None,
+) -> int:
+    tournament = tournament or pool.tournament
+    if award_pred is None:
+        award_pred = AwardPrediction.active().filter_by(pool_id=pool.id, user_id=user_id).first()
     if award_pred is None:
         return 0
     points = 0
