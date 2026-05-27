@@ -20,6 +20,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createPool, listTournaments, type AwardConfigPayload } from "@/lib/api";
+import { NewPoolPageSkeleton } from "@/components/page-skeletons";
 import { useAuth } from "@/contexts/auth";
 
 type ScoringState = {
@@ -125,6 +126,10 @@ export default function NewPoolPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (loading || !user) {
+    return <NewPoolPageSkeleton />;
   }
 
   return (

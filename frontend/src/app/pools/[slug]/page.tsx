@@ -30,6 +30,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getMatches, getPool, getPredictions, getPoolSnapshots, getRanking, joinPool, ordinalRound } from "@/lib/api";
+import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { Match, Pool, Prediction, RankingEntry, RoundSnapshot } from "@/types";
 import { useAuth } from "@/contexts/auth";
@@ -136,7 +137,7 @@ export default function PoolPage({ params }: PageProps) {
   }
 
   if (!pool) {
-    return <Text>Carregando bolão...</Text>;
+    return <PoolDetailPageSkeleton />;
   }
 
   return (

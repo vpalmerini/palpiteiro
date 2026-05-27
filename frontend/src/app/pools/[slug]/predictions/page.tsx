@@ -22,6 +22,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
 import { getAwardPrediction, getMatches, getPool, getPredictions, listTournamentTeams, ordinalRound, saveAwardPrediction, savePrediction } from "@/lib/api";
+import { PredictionsPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
 import { useAuth } from "@/contexts/auth";
@@ -160,8 +161,8 @@ export default function PredictionsPage({ params }: PageProps) {
     setMessage("Palpite salvo.");
   }
 
-  if (!pool) {
-    return <Text>Carregando palpites...</Text>;
+  if (authLoading || !user || !pool) {
+    return <PredictionsPageSkeleton />;
   }
 
   return (

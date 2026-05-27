@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { getMyPools } from "@/lib/api";
+import { MeusBoloesPageSkeleton } from "@/components/page-skeletons";
 import { useAuth } from "@/contexts/auth";
 import type { MyPoolsByTournament } from "@/types";
 
@@ -44,15 +45,12 @@ export default function MeusBoloes() {
     void getMyPools().then(setGroups);
   }, [user]);
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user) {
+    return <MeusBoloesPageSkeleton />;
+  }
 
   if (!groups) {
-    return (
-      <Stack gap={6} maxW="2xl" mx="auto">
-        <Heading size="xl">Meus Bolões</Heading>
-        <Text color="fg.muted">Carregando…</Text>
-      </Stack>
-    );
+    return <MeusBoloesPageSkeleton />;
   }
 
   if (groups.length === 0) {

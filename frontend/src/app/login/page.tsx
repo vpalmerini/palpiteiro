@@ -6,6 +6,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Box, Card, Text, VStack } from "@chakra-ui/react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useAuth } from "@/contexts/auth";
+import { LoginPageSkeleton, LoginRedirecting } from "@/components/page-skeletons";
 
 function LoginContent() {
   const { user, loading, signInWithGoogle } = useAuth();
@@ -13,6 +14,13 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
   const [error, setError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  useEffect(() => {
+    if (next.startsWith("/") && !next.startsWith("//")) {
+      router.prefetch(next);
+    }
+  }, [next, router]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -23,15 +31,18 @@ function LoginContent() {
   async function handleGoogleSuccess(credentialResponse: { credential?: string }) {
     if (!credentialResponse.credential) return;
     setError(null);
+    setIsSigningIn(true);
     try {
       await signInWithGoogle(credentialResponse.credential);
       router.replace(next);
     } catch {
+      setIsSigningIn(false);
       setError("Não foi possível entrar com Google. Tente novamente.");
     }
   }
 
-  if (loading) return null;
+  if (loading) return <LoginPageSkeleton />;
+  if (user || isSigningIn) return <LoginRedirecting />;
 
   return (
     <Box display="flex" justifyContent="center" alignItems="center" minH="60vh">
@@ -62,7 +73,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<LoginPageSkeleton />}>
       <LoginContent />
     </Suspense>
   );
