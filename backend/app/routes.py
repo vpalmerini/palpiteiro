@@ -90,7 +90,6 @@ def _pool_or_404(slug: str) -> Pool:
 def _user_payload(user: User) -> dict:
     return {
         "id": user.id,
-        "publicId": user.public_id,
         "name": user.name,
         "email": user.email,
         "pictureUrl": user.picture_url,
@@ -166,7 +165,7 @@ def _pool_payload(pool: Pool):
         "name": pool.name,
         "description": pool.description,
         "creatorName": pool.creator_name,
-        "creatorUserId": pool.creator.public_id if pool.creator else None,
+        "creatorUserId": pool.creator.id if pool.creator else None,
         "tournamentId": pool.tournament_id,
         "isParticipant": is_participant,
         "scoring": {
@@ -195,7 +194,7 @@ def _prediction_payload(prediction: Prediction):
     return {
         "id": prediction.id,
         "matchId": prediction.match_id,
-        "userId": prediction.user.public_id,
+        "userId": prediction.user.id,
         "homeScore": prediction.predicted_home_score,
         "awayScore": prediction.predicted_away_score,
         "predictsPenalties": prediction.predicts_penalties,
@@ -210,10 +209,14 @@ def _prediction_payload(prediction: Prediction):
     }
 
 
-def _parse_optional_int(value):
+def _parse_optional_id(value):
     if value is None or value == "":
         return None
-    return int(value)
+    return str(value)
+
+
+def _route_id(value) -> str:
+    return str(value)
 
 
 def _recalculate_scores(pool: Pool):
@@ -342,7 +345,7 @@ def create_pool():
     if not data.get("name") or not data.get("tournamentId"):
         abort(400, description="name and tournamentId are required")
 
-    tournament = Tournament.query.get(int(data["tournamentId"]))
+    tournament = db.session.get(Tournament, str(data["tournamentId"]))
     if tournament is None:
         abort(404, description="tournament not found")
 
@@ -458,7 +461,7 @@ def upsert_prediction(slug):
     pool = _pool_or_404(slug)
     user: User = g.current_user
     data = _json()
-    match = Match.query.filter_by(id=data.get("matchId"), tournament_id=pool.tournament_id).first_or_404()
+    match = Match.query.filter_by(id=str(data.get("matchId")), tournament_id=pool.tournament_id).first_or_404()
 
     if datetime.now(timezone.utc) >= _as_aware_utc(match.starts_at):
         abort(409, description="predictions are locked for this match")
@@ -470,7 +473,7 @@ def upsert_prediction(slug):
     predicted_home_score = int(data["homeScore"])
     predicted_away_score = int(data["awayScore"])
     predicts_penalties = match.stage.is_knockout and predicted_home_score == predicted_away_score
-    penalty_winner_team_id = _parse_optional_int(data.get("penaltyWinnerTeamId"))
+    penalty_winner_team_id = _parse_optional_id(data.get("penaltyWinnerTeamId"))
     if predicts_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
         abort(400, description="penalty winner is required for knockout draws")
 
@@ -542,7 +545,7 @@ def get_ranking(slug):
     _ensure_creator_membership(pool)
     entries = _build_ranking(pool)
     db.session.commit()
-    return jsonify([{k: v for k, v in e.items() if k != "userDbId"} for e in entries])
+    return jsonify([{k: v for k, v in e.items()} for e in entries])
 
 
 def _build_ranking(pool: Pool) -> list[dict]:
@@ -551,8 +554,7 @@ def _build_ranking(pool: Pool) -> list[dict]:
     rows = (
         db.session.query(
             PoolParticipant.display_name,
-            User.public_id,
-            User.id.label("user_db_id"),
+            User.id.label("user_id"),
             User.picture_url,
             func.coalesce(func.sum(ScoreEntry.points), 0).label("match_points"),
             func.coalesce(func.sum(func.cast(ScoreEntry.exact_score, db.Integer)), 0).label("exact_scores"),
@@ -568,15 +570,14 @@ def _build_ranking(pool: Pool) -> list[dict]:
         .outerjoin(Round, Round.id == Match.round_id)
         .outerjoin(Stage, Stage.id == Round.stage_id)
         .filter(PoolParticipant.pool_id == pool.id)
-        .group_by(PoolParticipant.display_name, User.public_id, User.id, PoolParticipant.joined_at)
+        .group_by(PoolParticipant.display_name, User.id, PoolParticipant.joined_at)
         .all()
     )
     entries = []
     for row in rows:
-        award_pts = _calculate_award_points(pool, row.user_db_id)
+        award_pts = _calculate_award_points(pool, row.user_id)
         entries.append({
-            "userDbId": row.user_db_id,
-            "userId": row.public_id,
+            "userId": row.user_id,
             "displayName": row.display_name,
             "pictureUrl": row.picture_url,
             "points": int(row.match_points) + award_pts,
@@ -591,10 +592,10 @@ def _build_ranking(pool: Pool) -> list[dict]:
     return entries
 
 
-@api.post("/admin/rounds/<int:round_id>/snapshot")
+@api.post("/admin/rounds/<uuid:round_id>/snapshot")
 @require_admin
 def generate_round_snapshot(round_id):
-    round_ = Round.query.get_or_404(round_id)
+    round_ = Round.query.get_or_404(_route_id(round_id))
     tournament = round_.stage.tournament
     pools = Pool.query.filter_by(tournament_id=tournament.id).all()
 
@@ -613,7 +614,7 @@ def generate_round_snapshot(round_id):
         for entry in ranking:
             db.session.add(RoundSnapshotEntry(
                 snapshot_id=snapshot.id,
-                user_id=entry["userDbId"],
+                user_id=entry["userId"],
                 display_name=entry["displayName"],
                 position=entry["position"],
                 points=entry["points"],
@@ -648,7 +649,7 @@ def _snapshot_payload(snapshot: RoundSnapshot) -> dict:
         "entries": [
             {
                 "position": e.position,
-                "userId": e.user.public_id,
+                "userId": e.user.id,
                 "displayName": e.display_name,
                 "points": e.points,
                 "exactScores": e.exact_scores,
@@ -679,15 +680,15 @@ def seed_data():
     return jsonify({"status": seed_database()})
 
 
-@api.post("/admin/matches/<int:match_id>/result")
+@api.post("/admin/matches/<uuid:match_id>/result")
 @require_admin
 def update_match_result(match_id):
-    match = Match.query.get_or_404(match_id)
+    match = Match.query.get_or_404(_route_id(match_id))
     data = _json()
     home_score = int(data["homeScore"])
     away_score = int(data["awayScore"])
     went_to_penalties = match.round.stage.is_knockout and home_score == away_score
-    penalty_winner_team_id = _parse_optional_int(data.get("penaltyWinnerTeamId"))
+    penalty_winner_team_id = _parse_optional_id(data.get("penaltyWinnerTeamId"))
     if went_to_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
         abort(400, description="penalty winner is required for knockout draws")
 
@@ -747,9 +748,9 @@ def _assert_tournament_editable(tournament: Tournament):
         abort(403, description="O torneio está encerrado e não pode ser editado")
 
 
-def _calculate_award_points(pool: Pool, user_db_id: int) -> int:
+def _calculate_award_points(pool: Pool, user_id: str) -> int:
     tournament = pool.tournament
-    award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, user_id=user_db_id).first()
+    award_pred = AwardPrediction.query.filter_by(pool_id=pool.id, user_id=user_id).first()
     if award_pred is None:
         return 0
     points = 0
@@ -798,7 +799,7 @@ def _group_payload(group: TournamentGroup):
     return {"id": group.id, "name": group.name, "stageId": group.stage_id}
 
 
-def _build_team_group_map(tournament_id: int) -> dict:
+def _build_team_group_map(tournament_id: str) -> dict:
     """Returns {team_id: TournamentGroup} for teams assigned to a group."""
     entries = (
         TournamentTeam.query
@@ -829,10 +830,10 @@ def create_tournament():
     return jsonify(_tournament_payload(tournament)), 201
 
 
-@api.patch("/admin/tournaments/<int:tournament_id>/status")
+@api.patch("/admin/tournaments/<uuid:tournament_id>/status")
 @require_admin
 def update_tournament_status(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(_route_id(tournament_id))
     data = _json()
     new_status = data.get("status")
     valid = [s.value for s in TournamentStatus]
@@ -843,17 +844,17 @@ def update_tournament_status(tournament_id):
     return jsonify(_tournament_payload(tournament))
 
 
-@api.get("/admin/tournaments/<int:tournament_id>/stages")
+@api.get("/admin/tournaments/<uuid:tournament_id>/stages")
 def list_stages(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(_route_id(tournament_id))
     stages = sorted(tournament.stages, key=lambda s: s.order)
     return jsonify([_stage_payload(s) for s in stages])
 
 
-@api.post("/admin/tournaments/<int:tournament_id>/stages")
+@api.post("/admin/tournaments/<uuid:tournament_id>/stages")
 @require_admin
 def create_stage(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(_route_id(tournament_id))
     _assert_tournament_editable(tournament)
     data = _json()
     name = (data.get("name") or "").strip()
@@ -861,7 +862,7 @@ def create_stage(tournament_id):
     if not name or order is None:
         abort(400, description="name and order are required")
     stage = Stage(
-        tournament_id=tournament_id,
+        tournament_id=tournament.id,
         name=name,
         order=int(order),
         stage_type=(data.get("stageType") or StageType.GROUP.value),
@@ -871,10 +872,10 @@ def create_stage(tournament_id):
     return jsonify(_stage_payload(stage)), 201
 
 
-@api.patch("/admin/stages/<int:stage_id>")
+@api.patch("/admin/stages/<uuid:stage_id>")
 @require_admin
 def update_stage(stage_id):
-    stage = Stage.query.get_or_404(stage_id)
+    stage = Stage.query.get_or_404(_route_id(stage_id))
     _assert_tournament_editable(stage.tournament)
     data = _json()
     if "name" in data:
@@ -891,32 +892,32 @@ def update_stage(stage_id):
 # Admin — rounds
 # ---------------------------------------------------------------------------
 
-@api.get("/admin/stages/<int:stage_id>/rounds")
+@api.get("/admin/stages/<uuid:stage_id>/rounds")
 def list_rounds(stage_id):
-    stage = Stage.query.get_or_404(stage_id)
+    stage = Stage.query.get_or_404(_route_id(stage_id))
     rounds = sorted(stage.rounds, key=lambda r: r.number)
     return jsonify([_round_payload(r) for r in rounds])
 
 
-@api.post("/admin/stages/<int:stage_id>/rounds")
+@api.post("/admin/stages/<uuid:stage_id>/rounds")
 @require_admin
 def create_round(stage_id):
-    stage = Stage.query.get_or_404(stage_id)
+    stage = Stage.query.get_or_404(_route_id(stage_id))
     _assert_tournament_editable(stage.tournament)
     data = _json()
     number = data.get("number")
     if number is None:
         abort(400, description="number is required")
-    round_ = Round(stage_id=stage_id, number=int(number))
+    round_ = Round(stage_id=_route_id(stage_id), number=int(number))
     db.session.add(round_)
     db.session.commit()
     return jsonify(_round_payload(round_)), 201
 
 
-@api.patch("/admin/rounds/<int:round_id>")
+@api.patch("/admin/rounds/<uuid:round_id>")
 @require_admin
 def update_round(round_id):
-    round_ = Round.query.get_or_404(round_id)
+    round_ = Round.query.get_or_404(_route_id(round_id))
     _assert_tournament_editable(round_.stage.tournament)
     data = _json()
     if "number" in data:
@@ -925,10 +926,10 @@ def update_round(round_id):
     return jsonify(_round_payload(round_))
 
 
-@api.delete("/admin/rounds/<int:round_id>")
+@api.delete("/admin/rounds/<uuid:round_id>")
 @require_admin
 def delete_round(round_id):
-    round_ = Round.query.get_or_404(round_id)
+    round_ = Round.query.get_or_404(_route_id(round_id))
     _assert_tournament_editable(round_.stage.tournament)
     for match in list(round_.matches):
         _delete_match_cascade(match)
@@ -969,10 +970,10 @@ def create_team():
     return jsonify(_team_full_payload(team)), 201
 
 
-@api.patch("/admin/teams/<int:team_id>")
+@api.patch("/admin/teams/<uuid:team_id>")
 @require_admin
-def update_team(team_id: int):
-    team = db.session.get(Team, team_id)
+def update_team(team_id):
+    team = db.session.get(Team, _route_id(team_id))
     if team is None:
         abort(404)
     data = _json()
@@ -999,59 +1000,66 @@ def _tournament_team_payload(entry: TournamentTeam) -> dict:
     }
 
 
-@api.get("/admin/tournaments/<int:tournament_id>/teams")
+@api.get("/admin/tournaments/<uuid:tournament_id>/teams")
 def list_tournament_teams(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
-    entries = TournamentTeam.query.filter_by(tournament_id=tournament_id).all()
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
+    entries = TournamentTeam.query.filter_by(tournament_id=tid).all()
     return jsonify([_tournament_team_payload(e) for e in entries])
 
 
-@api.post("/admin/tournaments/<int:tournament_id>/teams")
+@api.post("/admin/tournaments/<uuid:tournament_id>/teams")
 @require_admin
 def add_tournament_team(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
     data = _json()
-    team_id = data.get("teamId")
+    team_id = _parse_optional_id(data.get("teamId"))
     if not team_id:
         abort(400, description="teamId is required")
     Team.query.get_or_404(team_id)
-    existing = TournamentTeam.query.filter_by(tournament_id=tournament_id, team_id=team_id).first()
+    existing = TournamentTeam.query.filter_by(tournament_id=tid, team_id=team_id).first()
     if existing:
         abort(409, description="team already in tournament")
-    entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id)
+    entry = TournamentTeam(tournament_id=tid, team_id=team_id)
     db.session.add(entry)
     db.session.commit()
-    return jsonify({"tournamentId": tournament_id, "teamId": team_id}), 201
+    return jsonify({"tournamentId": tid, "teamId": team_id}), 201
 
 
-@api.delete("/admin/tournaments/<int:tournament_id>/teams/<int:team_id>")
+@api.delete("/admin/tournaments/<uuid:tournament_id>/teams/<uuid:team_id>")
 @require_admin
 def remove_tournament_team(tournament_id, team_id):
-    entry = TournamentTeam.query.filter_by(tournament_id=tournament_id, team_id=team_id).first_or_404()
+    entry = TournamentTeam.query.filter_by(
+        tournament_id=_route_id(tournament_id),
+        team_id=_route_id(team_id),
+    ).first_or_404()
     db.session.delete(entry)
     db.session.commit()
     return "", 204
 
 
-@api.patch("/admin/tournaments/<int:tournament_id>/teams/<int:team_id>/group")
+@api.patch("/admin/tournaments/<uuid:tournament_id>/teams/<uuid:team_id>/group")
 @require_admin
 def assign_team_group(tournament_id, team_id):
-    entry = TournamentTeam.query.filter_by(tournament_id=tournament_id, team_id=team_id).first_or_404()
+    tid = _route_id(tournament_id)
+    entry = TournamentTeam.query.filter_by(tournament_id=tid, team_id=_route_id(team_id)).first_or_404()
     data = _json()
-    group_id = _parse_optional_int(data.get("groupId"))
+    group_id = _parse_optional_id(data.get("groupId"))
     if group_id is not None:
         group = TournamentGroup.query.get_or_404(group_id)
-        if group.stage.tournament_id != tournament_id:
+        if group.stage.tournament_id != tid:
             abort(400, description="group does not belong to this tournament")
     entry.group_id = group_id
     db.session.commit()
     return jsonify(_tournament_team_payload(entry))
 
 
-@api.get("/admin/tournaments/<int:tournament_id>/groups")
+@api.get("/admin/tournaments/<uuid:tournament_id>/groups")
 def list_tournament_groups(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
-    stages = Stage.query.filter_by(tournament_id=tournament_id, stage_type=StageType.GROUP.value).all()
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
+    stages = Stage.query.filter_by(tournament_id=tid, stage_type=StageType.GROUP.value).all()
     groups = []
     for stage in stages:
         for g in stage.groups:
@@ -1060,26 +1068,26 @@ def list_tournament_groups(tournament_id):
     return jsonify(groups)
 
 
-@api.post("/admin/stages/<int:stage_id>/groups")
+@api.post("/admin/stages/<uuid:stage_id>/groups")
 @require_admin
 def create_group(stage_id):
-    stage = Stage.query.get_or_404(stage_id)
+    stage = Stage.query.get_or_404(_route_id(stage_id))
     if stage.stage_type != StageType.GROUP.value:
         abort(400, description="groups can only be created for group-type stages")
     data = _json()
     name = (data.get("name") or "").strip()
     if not name:
         abort(400, description="name is required")
-    group = TournamentGroup(stage_id=stage_id, name=name)
+    group = TournamentGroup(stage_id=_route_id(stage_id), name=name)
     db.session.add(group)
     db.session.commit()
     return jsonify(_group_payload(group)), 201
 
 
-@api.patch("/admin/groups/<int:group_id>")
+@api.patch("/admin/groups/<uuid:group_id>")
 @require_admin
 def update_group(group_id):
-    group = TournamentGroup.query.get_or_404(group_id)
+    group = TournamentGroup.query.get_or_404(_route_id(group_id))
     data = _json()
     if "name" in data:
         group.name = (data["name"] or "").strip() or group.name
@@ -1087,10 +1095,10 @@ def update_group(group_id):
     return jsonify(_group_payload(group))
 
 
-@api.delete("/admin/groups/<int:group_id>")
+@api.delete("/admin/groups/<uuid:group_id>")
 @require_admin
 def delete_group(group_id):
-    group = TournamentGroup.query.get_or_404(group_id)
+    group = TournamentGroup.query.get_or_404(_route_id(group_id))
     TournamentTeam.query.filter_by(group_id=group_id).update({"group_id": None})
     db.session.delete(group)
     db.session.commit()
@@ -1101,38 +1109,40 @@ def delete_group(group_id):
 # Admin — matches
 # ---------------------------------------------------------------------------
 
-@api.get("/admin/tournaments/<int:tournament_id>/matches")
+@api.get("/admin/tournaments/<uuid:tournament_id>/matches")
 def list_tournament_matches(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
     matches = (
-        Match.query.filter_by(tournament_id=tournament_id)
+        Match.query.filter_by(tournament_id=tid)
         .join(Round)
         .join(Stage, Stage.id == Round.stage_id)
         .order_by(Stage.order, Round.number, Match.starts_at)
         .all()
     )
-    tgm = _build_team_group_map(tournament_id)
+    tgm = _build_team_group_map(tid)
     return jsonify([_match_payload(m, tgm) for m in matches])
 
 
-@api.post("/admin/tournaments/<int:tournament_id>/matches")
+@api.post("/admin/tournaments/<uuid:tournament_id>/matches")
 @require_admin
 def create_match(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tid = _route_id(tournament_id)
+    tournament = Tournament.query.get_or_404(tid)
     _assert_tournament_editable(tournament)
     data = _json()
     round_id = data.get("roundId")
     starts_at_raw = data.get("startsAt")
     if not round_id or not starts_at_raw:
         abort(400, description="roundId and startsAt are required")
-    round_ = Round.query.get_or_404(int(round_id))
-    if round_.stage.tournament_id != tournament_id:
+    round_ = Round.query.get_or_404(_route_id(round_id))
+    if round_.stage.tournament_id != tid:
         abort(400, description="round does not belong to this tournament")
     match = Match(
-        tournament_id=tournament_id,
+        tournament_id=tid,
         round_id=round_.id,
-        home_team_id=_parse_optional_int(data.get("homeTeamId")),
-        away_team_id=_parse_optional_int(data.get("awayTeamId")),
+        home_team_id=_parse_optional_id(data.get("homeTeamId")),
+        away_team_id=_parse_optional_id(data.get("awayTeamId")),
         starts_at=_parse_starts_at(starts_at_raw),
         venue=data.get("venue") or None,
     )
@@ -1141,22 +1151,22 @@ def create_match(tournament_id):
     return jsonify(_match_payload(match)), 201
 
 
-@api.patch("/admin/matches/<int:match_id>")
+@api.patch("/admin/matches/<uuid:match_id>")
 @require_admin
 def update_match(match_id):
-    match = Match.query.get_or_404(match_id)
+    match = Match.query.get_or_404(_route_id(match_id))
     _assert_tournament_editable(match.tournament)
     data = _json()
 
     if "roundId" in data:
-        round_ = Round.query.get_or_404(int(data["roundId"]))
+        round_ = Round.query.get_or_404(_route_id(data["roundId"]))
         if round_.stage.tournament_id != match.tournament_id:
             abort(400, description="round does not belong to this tournament")
         match.round_id = round_.id
     if "homeTeamId" in data:
-        match.home_team_id = _parse_optional_int(data["homeTeamId"])
+        match.home_team_id = _parse_optional_id(data["homeTeamId"])
     if "awayTeamId" in data:
-        match.away_team_id = _parse_optional_int(data["awayTeamId"])
+        match.away_team_id = _parse_optional_id(data["awayTeamId"])
     if "startsAt" in data:
         match.starts_at = _parse_starts_at(data["startsAt"])
     if "venue" in data:
@@ -1168,7 +1178,7 @@ def update_match(match_id):
         home_score = int(data["homeScore"])
         away_score = int(data["awayScore"])
         went_to_penalties = match.round.stage.is_knockout and home_score == away_score
-        penalty_winner_team_id = _parse_optional_int(data.get("penaltyWinnerTeamId"))
+        penalty_winner_team_id = _parse_optional_id(data.get("penaltyWinnerTeamId"))
         if went_to_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
             abort(400, description="penalty winner is required for knockout draws")
         match.home_score = home_score
@@ -1183,10 +1193,10 @@ def update_match(match_id):
     return jsonify(_match_payload(match))
 
 
-@api.delete("/admin/matches/<int:match_id>")
+@api.delete("/admin/matches/<uuid:match_id>")
 @require_admin
 def delete_match(match_id):
-    match = Match.query.get_or_404(match_id)
+    match = Match.query.get_or_404(_route_id(match_id))
     _assert_tournament_editable(match.tournament)
     _delete_match_cascade(match)
     db.session.commit()
@@ -1201,10 +1211,10 @@ def _delete_match_cascade(match: Match) -> None:
     db.session.delete(match)
 
 
-@api.delete("/admin/stages/<int:stage_id>")
+@api.delete("/admin/stages/<uuid:stage_id>")
 @require_admin
 def delete_stage(stage_id):
-    stage = Stage.query.get_or_404(stage_id)
+    stage = Stage.query.get_or_404(_route_id(stage_id))
     _assert_tournament_editable(stage.tournament)
     for round_ in list(stage.rounds):
         for match in list(round_.matches):
@@ -1237,11 +1247,12 @@ def list_teams_public():
     return jsonify([_team_full_payload(t) for t in teams])
 
 
-@api.get("/tournaments/<int:tournament_id>/teams")
+@api.get("/tournaments/<uuid:tournament_id>/teams")
 def list_tournament_teams_public(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
     entries = (
-        TournamentTeam.query.filter_by(tournament_id=tournament_id)
+        TournamentTeam.query.filter_by(tournament_id=tid)
         .join(Team)
         .order_by(Team.name)
         .all()
@@ -1277,11 +1288,11 @@ def upsert_award_prediction(slug):
         award_pred = AwardPrediction(pool_id=pool.id, user_id=user.id)
         db.session.add(award_pred)
     if pool.predict_champion:
-        award_pred.champion_team_id = _parse_optional_int(data.get("championTeamId"))
+        award_pred.champion_team_id = _parse_optional_id(data.get("championTeamId"))
     if pool.predict_runner_up:
-        award_pred.runner_up_team_id = _parse_optional_int(data.get("runnerUpTeamId"))
+        award_pred.runner_up_team_id = _parse_optional_id(data.get("runnerUpTeamId"))
     if pool.predict_third_place:
-        award_pred.third_place_team_id = _parse_optional_int(data.get("thirdPlaceTeamId"))
+        award_pred.third_place_team_id = _parse_optional_id(data.get("thirdPlaceTeamId"))
     if pool.predict_top_scorer:
         award_pred.top_scorer = (data.get("topScorer") or "").strip() or None
     if pool.predict_best_player:
@@ -1290,18 +1301,18 @@ def upsert_award_prediction(slug):
     return jsonify(_award_prediction_payload(award_pred))
 
 
-@api.patch("/admin/tournaments/<int:tournament_id>/awards")
+@api.patch("/admin/tournaments/<uuid:tournament_id>/awards")
 @require_admin
 def update_tournament_awards(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = Tournament.query.get_or_404(_route_id(tournament_id))
     _assert_tournament_editable(tournament)
     data = _json()
     if "championTeamId" in data:
-        tournament.champion_team_id = _parse_optional_int(data["championTeamId"])
+        tournament.champion_team_id = _parse_optional_id(data["championTeamId"])
     if "runnerUpTeamId" in data:
-        tournament.runner_up_team_id = _parse_optional_int(data["runnerUpTeamId"])
+        tournament.runner_up_team_id = _parse_optional_id(data["runnerUpTeamId"])
     if "thirdPlaceTeamId" in data:
-        tournament.third_place_team_id = _parse_optional_int(data["thirdPlaceTeamId"])
+        tournament.third_place_team_id = _parse_optional_id(data["thirdPlaceTeamId"])
     if "topScorer" in data:
         tournament.top_scorer = (data["topScorer"] or "").strip() or None
     if "bestPlayer" in data:
@@ -1310,10 +1321,11 @@ def update_tournament_awards(tournament_id):
     return jsonify(_tournament_payload(tournament))
 
 
-@api.get("/admin/tournaments/<int:tournament_id>/pools")
+@api.get("/admin/tournaments/<uuid:tournament_id>/pools")
 def list_tournament_pools(tournament_id):
-    Tournament.query.get_or_404(tournament_id)
-    pools = Pool.query.filter_by(tournament_id=tournament_id).order_by(Pool.created_at.desc()).all()
+    tid = _route_id(tournament_id)
+    Tournament.query.get_or_404(tid)
+    pools = Pool.query.filter_by(tournament_id=tid).order_by(Pool.created_at.desc()).all()
     return jsonify(
         [
             {

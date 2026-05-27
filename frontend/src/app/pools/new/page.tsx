@@ -75,8 +75,8 @@ export default function NewPoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scoring, setScoring] = useState<ScoringState>(DEFAULT_SCORING);
   const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
-  const [tournaments, setTournaments] = useState<{ id: number; name: string; year: number; status: string }[]>([]);
-  const [tournamentId, setTournamentId] = useState<number | null>(null);
+  const [tournaments, setTournaments] = useState<{ id: string; name: string; year: number; status: string }[]>([]);
+  const [tournamentId, setTournamentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -157,7 +157,7 @@ export default function NewPoolPage() {
                 <NativeSelect.Root>
                   <NativeSelect.Field
                     value={tournamentId ?? ""}
-                    onChange={(e) => setTournamentId(Number(e.target.value))}
+                    onChange={(e) => setTournamentId(e.target.value || null)}
                   >
                     {tournaments.map((t) => (
                       <option key={t.id} value={t.id}>

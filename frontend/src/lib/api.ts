@@ -1,6 +1,7 @@
 import type {
   AdminPool,
   AwardPrediction,
+  EntityId,
   Match,
   MyPoolsByTournament,
   Pool,
@@ -76,7 +77,7 @@ export function logout() {
 export type AwardConfigPayload = { enabled: boolean; points: number };
 
 export function createPool(payload: {
-  tournamentId: number;
+  tournamentId: EntityId;
   name: string;
   description: string;
   creatorNickname?: string;
@@ -122,10 +123,10 @@ export function getPredictions(slug: string) {
 export function savePrediction(
   slug: string,
   payload: {
-    matchId: number;
+    matchId: EntityId;
     homeScore: number;
     awayScore: number;
-    penaltyWinnerTeamId?: number | null;
+    penaltyWinnerTeamId?: EntityId | null;
   },
 ) {
   return request<Prediction>(`/pools/${slug}/predictions`, {
@@ -143,9 +144,9 @@ export function getAwardPrediction(slug: string) {
 export function saveAwardPrediction(
   slug: string,
   payload: {
-    championTeamId?: number | null;
-    runnerUpTeamId?: number | null;
-    thirdPlaceTeamId?: number | null;
+    championTeamId?: EntityId | null;
+    runnerUpTeamId?: EntityId | null;
+    thirdPlaceTeamId?: EntityId | null;
     topScorer?: string;
     bestPlayer?: string;
   },
@@ -179,12 +180,12 @@ export function adminCreateTournament(payload: { name: string; year: number }) {
   });
 }
 
-export function adminListStages(tournamentId: number) {
+export function adminListStages(tournamentId: EntityId) {
   return request<Stage[]>(`/admin/tournaments/${tournamentId}/stages`);
 }
 
 export function adminCreateStage(
-  tournamentId: number,
+  tournamentId: EntityId,
   payload: { name: string; order: number; stageType: string },
 ) {
   return request<Stage>(`/admin/tournaments/${tournamentId}/stages`, {
@@ -194,7 +195,7 @@ export function adminCreateStage(
 }
 
 export function adminUpdateStage(
-  stageId: number,
+  stageId: EntityId,
   payload: Partial<{ name: string; order: number; stageType: string }>,
 ) {
   return request<Stage>(`/admin/stages/${stageId}`, {
@@ -207,13 +208,13 @@ export function adminListTeams() {
   return request<Team[]>("/admin/teams");
 }
 
-export function adminListMatches(tournamentId: number) {
+export function adminListMatches(tournamentId: EntityId) {
   return request<Match[]>(`/admin/tournaments/${tournamentId}/matches`);
 }
 
 export function adminCreateMatch(
-  tournamentId: number,
-  payload: { roundId: number; startsAt: string; homeTeamId?: number | null; awayTeamId?: number | null },
+  tournamentId: EntityId,
+  payload: { roundId: EntityId; startsAt: string; homeTeamId?: EntityId | null; awayTeamId?: EntityId | null },
 ) {
   return request<Match>(`/admin/tournaments/${tournamentId}/matches`, {
     method: "POST",
@@ -221,54 +222,54 @@ export function adminCreateMatch(
   });
 }
 
-export function adminListStageRounds(stageId: number) {
+export function adminListStageRounds(stageId: EntityId) {
   return request<Round[]>(`/admin/stages/${stageId}/rounds`);
 }
 
-export function adminCreateRound(stageId: number, payload: { number: number }) {
+export function adminCreateRound(stageId: EntityId, payload: { number: number }) {
   return request<Round>(`/admin/stages/${stageId}/rounds`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function adminUpdateRound(roundId: number, payload: { number: number }) {
+export function adminUpdateRound(roundId: EntityId, payload: { number: number }) {
   return request<Round>(`/admin/rounds/${roundId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
 
-export function adminDeleteRound(roundId: number) {
+export function adminDeleteRound(roundId: EntityId) {
   return request<void>(`/admin/rounds/${roundId}`, { method: "DELETE" });
 }
 
-export function adminGenerateRoundSnapshot(roundId: number) {
-  return request<{ roundId: number; roundNumber: number; stageName: string; poolsSnapshotted: number }>(
+export function adminGenerateRoundSnapshot(roundId: EntityId) {
+  return request<{ roundId: EntityId; roundNumber: number; stageName: string; poolsSnapshotted: number }>(
     `/admin/rounds/${roundId}/snapshot`,
     { method: "POST" },
   );
 }
 
-export function adminDeleteMatch(matchId: number) {
+export function adminDeleteMatch(matchId: EntityId) {
   return request<void>(`/admin/matches/${matchId}`, { method: "DELETE" });
 }
 
-export function adminDeleteStage(stageId: number) {
+export function adminDeleteStage(stageId: EntityId) {
   return request<void>(`/admin/stages/${stageId}`, { method: "DELETE" });
 }
 
 export function adminUpdateMatch(
-  matchId: number,
+  matchId: EntityId,
   payload: Partial<{
-    roundId: number;
-    homeTeamId: number | null;
-    awayTeamId: number | null;
+    roundId: EntityId;
+    homeTeamId: EntityId | null;
+    awayTeamId: EntityId | null;
     startsAt: string;
     status: string;
     homeScore: number;
     awayScore: number;
-    penaltyWinnerTeamId: number | null;
+    penaltyWinnerTeamId: EntityId | null;
   }>,
 ) {
   return request<Match>(`/admin/matches/${matchId}`, {
@@ -277,54 +278,54 @@ export function adminUpdateMatch(
   });
 }
 
-export function adminListPools(tournamentId: number) {
+export function adminListPools(tournamentId: EntityId) {
   return request<AdminPool[]>(`/admin/tournaments/${tournamentId}/pools`);
 }
 
-export function listTournamentTeams(tournamentId: number) {
+export function listTournamentTeams(tournamentId: EntityId) {
   return request<Team[]>(`/tournaments/${tournamentId}/teams`);
 }
 
-export function adminListTournamentTeams(tournamentId: number) {
+export function adminListTournamentTeams(tournamentId: EntityId) {
   return request<TournamentTeamEntry[]>(`/admin/tournaments/${tournamentId}/teams`);
 }
 
-export function adminAddTournamentTeam(tournamentId: number, teamId: number) {
-  return request<{ tournamentId: number; teamId: number }>(`/admin/tournaments/${tournamentId}/teams`, {
+export function adminAddTournamentTeam(tournamentId: EntityId, teamId: EntityId) {
+  return request<{ tournamentId: EntityId; teamId: EntityId }>(`/admin/tournaments/${tournamentId}/teams`, {
     method: "POST",
     body: JSON.stringify({ teamId }),
   });
 }
 
-export function adminRemoveTournamentTeam(tournamentId: number, teamId: number) {
+export function adminRemoveTournamentTeam(tournamentId: EntityId, teamId: EntityId) {
   return request<void>(`/admin/tournaments/${tournamentId}/teams/${teamId}`, {
     method: "DELETE",
   });
 }
 
-export function adminAssignTeamGroup(tournamentId: number, teamId: number, groupId: number | null) {
+export function adminAssignTeamGroup(tournamentId: EntityId, teamId: EntityId, groupId: EntityId | null) {
   return request<TournamentTeamEntry>(`/admin/tournaments/${tournamentId}/teams/${teamId}/group`, {
     method: "PATCH",
     body: JSON.stringify({ groupId }),
   });
 }
 
-export function adminListTournamentGroups(tournamentId: number) {
+export function adminListTournamentGroups(tournamentId: EntityId) {
   return request<TournamentGroup[]>(`/admin/tournaments/${tournamentId}/groups`);
 }
 
-export function adminCreateGroup(stageId: number, payload: { name: string }) {
+export function adminCreateGroup(stageId: EntityId, payload: { name: string }) {
   return request<TournamentGroup>(`/admin/stages/${stageId}/groups`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function adminDeleteGroup(groupId: number) {
+export function adminDeleteGroup(groupId: EntityId) {
   return request<void>(`/admin/groups/${groupId}`, { method: "DELETE" });
 }
 
-export function adminRenameGroup(groupId: number, payload: { name: string }) {
+export function adminRenameGroup(groupId: EntityId, payload: { name: string }) {
   return request<TournamentGroup>(`/admin/groups/${groupId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
@@ -332,7 +333,7 @@ export function adminRenameGroup(groupId: number, payload: { name: string }) {
 }
 
 export function adminUpdateTeam(
-  teamId: number,
+  teamId: EntityId,
   payload: Partial<{ name: string; shortName: string; flagCode: string; logoUrl: string }>,
 ) {
   return request<Team>(`/admin/teams/${teamId}`, {
@@ -355,14 +356,14 @@ export function adminCreateTeam(payload: {
 }
 
 export function listTournaments() {
-  return request<{ id: number; name: string; year: number; status: string }[]>("/tournaments");
+  return request<{ id: EntityId; name: string; year: number; status: string }[]>("/tournaments");
 }
 
 export function listTeams() {
   return request<Team[]>("/teams");
 }
 
-export function adminUpdateTournamentStatus(tournamentId: number, status: TournamentStatus) {
+export function adminUpdateTournamentStatus(tournamentId: EntityId, status: TournamentStatus) {
   return request<Tournament>(`/admin/tournaments/${tournamentId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
@@ -370,11 +371,11 @@ export function adminUpdateTournamentStatus(tournamentId: number, status: Tourna
 }
 
 export function adminUpdateTournamentAwards(
-  tournamentId: number,
+  tournamentId: EntityId,
   payload: Partial<{
-    championTeamId: number | null;
-    runnerUpTeamId: number | null;
-    thirdPlaceTeamId: number | null;
+    championTeamId: EntityId | null;
+    runnerUpTeamId: EntityId | null;
+    thirdPlaceTeamId: EntityId | null;
     topScorer: string;
     bestPlayer: string;
   }>,

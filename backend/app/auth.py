@@ -16,9 +16,9 @@ def _secret() -> str:
     return current_app.config["JWT_SECRET"]
 
 
-def make_session_jwt(user_id: int) -> str:
+def make_session_jwt(user_id: str) -> str:
     payload = {
-        "sub": str(user_id),
+        "sub": user_id,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(days=EXPIRY_DAYS),
     }
@@ -34,7 +34,7 @@ def get_current_user():
         return None
     try:
         payload = jwt.decode(token, _secret(), algorithms=[ALGORITHM])
-        return db.session.get(User, int(payload["sub"]))
+        return db.session.get(User, payload["sub"])
     except jwt.PyJWTError:
         return None
 

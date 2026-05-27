@@ -1,6 +1,8 @@
+/** UUID string primary keys from the API. */
+export type EntityId = string;
+
 export type User = {
-  id: number;
-  publicId: string;
+  id: EntityId;
   name: string;
   email: string;
   pictureUrl: string | null;
@@ -18,13 +20,13 @@ export type AwardConfig = {
 };
 
 export type Pool = {
-  id: number;
+  id: EntityId;
   slug: string;
   name: string;
   description: string | null;
   creatorName: string;
-  creatorUserId: string | null;
-  tournamentId: number;
+  creatorUserId: EntityId | null;
+  tournamentId: EntityId;
   isParticipant: boolean;
   awardsLocked: boolean;
   scoring: {
@@ -44,10 +46,10 @@ export type Pool = {
 };
 
 export type AwardPrediction = {
-  id: number;
-  championTeamId: number | null;
-  runnerUpTeamId: number | null;
-  thirdPlaceTeamId: number | null;
+  id: EntityId;
+  championTeamId: EntityId | null;
+  runnerUpTeamId: EntityId | null;
+  thirdPlaceTeamId: EntityId | null;
   topScorer: string | null;
   bestPlayer: string | null;
   updatedAt: string;
@@ -56,25 +58,25 @@ export type AwardPrediction = {
 export type TeamType = "club" | "national";
 
 export type Team = {
-  id: number;
+  id: EntityId;
   name: string;
   shortName: string | null;
   teamType: TeamType;
-  flagCode: string | null;   // ISO 3166-1 alpha-2, e.g. "BR" — national teams
-  logoUrl: string | null;    // absolute URL to crest/flag image — clubs or custom
+  flagCode: string | null;
+  logoUrl: string | null;
 };
 
 export type Round = {
-  id: number;
+  id: EntityId;
   number: number;
-  stageId: number;
+  stageId: EntityId;
 };
 
 export type Match = {
-  id: number;
+  id: EntityId;
   round: Round;
   stage: {
-    id: number;
+    id: EntityId;
     name: string;
     stageType: StageType;
     isKnockout: boolean;
@@ -88,7 +90,7 @@ export type Match = {
   homeScore: number | null;
   awayScore: number | null;
   wentToPenalties: boolean;
-  penaltyWinnerTeamId: number | null;
+  penaltyWinnerTeamId: EntityId | null;
   isLocked: boolean;
 };
 
@@ -100,13 +102,13 @@ export type PredictionScore = {
 };
 
 export type Prediction = {
-  id: number;
-  matchId: number;
-  userId: string;
+  id: EntityId;
+  matchId: EntityId;
+  userId: EntityId;
   homeScore: number;
   awayScore: number;
   predictsPenalties: boolean;
-  penaltyWinnerTeamId: number | null;
+  penaltyWinnerTeamId: EntityId | null;
   updatedAt: string;
   score: PredictionScore | null;
 };
@@ -114,7 +116,7 @@ export type Prediction = {
 export type RankingEntry = {
   position: number;
   displayName: string;
-  userId: string;
+  userId: EntityId;
   pictureUrl: string | null;
   points: number;
   exactScores: number;
@@ -126,7 +128,7 @@ export type RankingEntry = {
 export type TournamentStatus = "ongoing" | "finished";
 
 export type Tournament = {
-  id: number;
+  id: EntityId;
   name: string;
   year: number;
   status: TournamentStatus;
@@ -134,12 +136,12 @@ export type Tournament = {
   matchesCount: number;
   poolsCount: number;
   awards: {
-    championTeamId: number | null;
-    championTeam: { id: number; name: string; shortName: string } | null;
-    runnerUpTeamId: number | null;
-    runnerUpTeam: { id: number; name: string; shortName: string } | null;
-    thirdPlaceTeamId: number | null;
-    thirdPlaceTeam: { id: number; name: string; shortName: string } | null;
+    championTeamId: EntityId | null;
+    championTeam: { id: EntityId; name: string; shortName: string } | null;
+    runnerUpTeamId: EntityId | null;
+    runnerUpTeam: { id: EntityId; name: string; shortName: string } | null;
+    thirdPlaceTeamId: EntityId | null;
+    thirdPlaceTeam: { id: EntityId; name: string; shortName: string } | null;
     topScorer: string | null;
     bestPlayer: string | null;
   };
@@ -155,20 +157,20 @@ export type MyPoolEntry = {
 };
 
 export type MyPoolsByTournament = {
-  tournament: { id: number; name: string; year: number; status: TournamentStatus };
+  tournament: { id: EntityId; name: string; year: number; status: TournamentStatus };
   pools: MyPoolEntry[];
 };
 
 export type StageType = "group" | "league" | "knockout";
 
 export type TournamentGroup = {
-  id: number;
+  id: EntityId;
   name: string;
-  stageId: number;
+  stageId: EntityId;
 };
 
 export type Stage = {
-  id: number;
+  id: EntityId;
   name: string;
   order: number;
   stageType: StageType;
@@ -178,13 +180,13 @@ export type Stage = {
 };
 
 export type TournamentTeamEntry = Team & {
-  groupId: number | null;
+  groupId: EntityId | null;
   groupName: string | null;
 };
 
 export type RoundSnapshotEntry = {
   position: number;
-  userId: string;
+  userId: EntityId;
   displayName: string;
   points: number;
   exactScores: number;
@@ -194,10 +196,10 @@ export type RoundSnapshotEntry = {
 };
 
 export type RoundSnapshot = {
-  id: number;
-  roundId: number;
+  id: EntityId;
+  roundId: EntityId;
   roundNumber: number;
-  stageId: number;
+  stageId: EntityId;
   stageName: string;
   stageOrder: number;
   stageType: StageType;
@@ -206,7 +208,7 @@ export type RoundSnapshot = {
 };
 
 export type AdminPool = {
-  id: number;
+  id: EntityId;
   slug: string;
   name: string;
   creatorName: string;

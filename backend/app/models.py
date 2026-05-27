@@ -4,6 +4,8 @@ from uuid import uuid4
 
 from .extensions import db
 
+UUID = db.String(36)
+
 
 def utc_now():
     return datetime.now(timezone.utc)
@@ -38,9 +40,8 @@ class StageType(str, Enum):
 # ── Auth / Identity ──────────────────────────────────────────────────────────
 
 class User(db.Model):
-    """Authenticated account. Replaces the old unauthenticated Participant."""
-    id = db.Column(db.Integer, primary_key=True)
-    public_id = db.Column(db.String(36), unique=True, nullable=False, default=_uuid4_str)
+    """Authenticated account."""
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     google_id = db.Column(db.String(128), unique=True, nullable=False, index=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
@@ -53,14 +54,14 @@ class User(db.Model):
 # ── Tournament / Teams ────────────────────────────────────────────────────────
 
 class Tournament(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(160), nullable=False)
     year = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(24), nullable=False, default=TournamentStatus.ONGOING.value)
     starts_at = db.Column(db.DateTime(timezone=True), nullable=True)
-    champion_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
-    runner_up_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
-    third_place_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
+    champion_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    runner_up_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    third_place_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
     top_scorer = db.Column(db.String(120), nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
 
@@ -74,20 +75,18 @@ class Tournament(db.Model):
 
 
 class Team(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(120), nullable=False)
     short_name = db.Column(db.String(12), nullable=True)
     team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
-    # flag_code: ISO 3166-1 alpha-2 (e.g. "BR", "AR") — used for national team flag emoji
     flag_code = db.Column(db.String(2), nullable=True)
-    # logo_url: absolute URL to crest/flag image — overrides flag_code when present
     logo_url = db.Column(db.String(500), nullable=True)
 
 
 class TournamentGroup(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("stage.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -99,11 +98,11 @@ class TournamentGroup(db.Model):
 
 
 class TournamentTeam(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    tournament_id = db.Column(db.Integer, db.ForeignKey("tournament.id"), nullable=False)
-    team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=False, index=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
+    tournament_id = db.Column(UUID, db.ForeignKey("tournament.id"), nullable=False)
+    team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=False, index=True)
     group_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("tournament_group.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -118,9 +117,9 @@ class TournamentTeam(db.Model):
 # ── Stages / Rounds / Matches ─────────────────────────────────────────────────
 
 class Stage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("tournament.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -145,9 +144,9 @@ class Stage(db.Model):
 
 
 class Round(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("stage.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -158,28 +157,28 @@ class Round(db.Model):
 
 
 class Match(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("tournament.id"),
         nullable=False,
         index=True,
     )
     round_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("round.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    home_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
-    away_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
+    home_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    away_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
     starts_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
     venue = db.Column(db.String(120), nullable=True)
     status = db.Column(db.String(24), nullable=False, default=MatchStatus.SCHEDULED.value, index=True)
     home_score = db.Column(db.Integer, nullable=True)
     away_score = db.Column(db.Integer, nullable=True)
     went_to_penalties = db.Column(db.Boolean, nullable=False, default=False)
-    penalty_winner_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
+    penalty_winner_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
 
     tournament = db.relationship("Tournament", backref="matches")
     round = db.relationship("Round", backref=db.backref("matches", passive_deletes=True))
@@ -208,19 +207,19 @@ class Match(db.Model):
 # ── Pools ─────────────────────────────────────────────────────────────────────
 
 class Pool(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     slug = db.Column(db.String(64), unique=True, nullable=False, index=True)
     name = db.Column(db.String(160), nullable=False)
     description = db.Column(db.Text, nullable=True)
     creator_name = db.Column(db.String(120), nullable=False)
     creator_user_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("user.id"),
         nullable=True,
         index=True,
     )
     tournament_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("tournament.id"),
         nullable=False,
         index=True,
@@ -246,9 +245,9 @@ class Pool(db.Model):
 
 
 class PoolPrize(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("pool.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -263,14 +262,14 @@ class PoolPrize(db.Model):
 
 
 class PoolParticipant(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("pool.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("user.id"),
         nullable=False,
         index=True,
@@ -288,20 +287,20 @@ class PoolParticipant(db.Model):
 # ── Predictions & Scoring ─────────────────────────────────────────────────────
 
 class Prediction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("pool.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("user.id"),
         nullable=False,
         index=True,
     )
     match_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("match.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -309,7 +308,7 @@ class Prediction(db.Model):
     predicted_home_score = db.Column(db.Integer, nullable=False)
     predicted_away_score = db.Column(db.Integer, nullable=False)
     predicts_penalties = db.Column(db.Boolean, nullable=False, default=False)
-    predicted_penalty_winner_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+    predicted_penalty_winner_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
 
@@ -325,9 +324,9 @@ class Prediction(db.Model):
 
 
 class ScoreEntry(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     prediction_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("prediction.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
@@ -349,21 +348,21 @@ class ScoreEntry(db.Model):
 
 
 class AwardPrediction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("pool.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("user.id"),
         nullable=False,
         index=True,
     )
-    champion_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
-    runner_up_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
-    third_place_team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
+    champion_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    runner_up_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    third_place_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
     top_scorer = db.Column(db.String(120), nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
@@ -379,14 +378,14 @@ class AwardPrediction(db.Model):
 # ── Ranking Snapshots ─────────────────────────────────────────────────────────
 
 class RoundSnapshot(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     round_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("round.id", ondelete="CASCADE"),
         nullable=False,
     )
     pool_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("pool.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -405,15 +404,15 @@ class RoundSnapshot(db.Model):
 
 
 class RoundSnapshotEntry(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     snapshot_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("round_snapshot.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     user_id = db.Column(
-        db.Integer,
+        UUID,
         db.ForeignKey("user.id"),
         nullable=False,
         index=True,

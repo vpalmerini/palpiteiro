@@ -47,8 +47,8 @@ export default function PredictionsPage({ params }: PageProps) {
   const [pool, setPool] = useState<Pool | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [predictions, setPredictions] = useState<Record<number, Prediction>>({});
-  const [scoreDrafts, setScoreDrafts] = useState<Record<number, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
+  const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
   const [savedAwardPrediction, setSavedAwardPrediction] = useState<AwardPrediction | null>(null);
   const [awardDraft, setAwardDraft] = useState<AwardDraft>({ championTeamId: "", runnerUpTeamId: "", thirdPlaceTeamId: "", topScorer: "", bestPlayer: "" });
   const [awardLocked, setAwardLocked] = useState(false);
@@ -106,7 +106,7 @@ export default function PredictionsPage({ params }: PageProps) {
     });
   }, [slug, user]);
 
-  function updateDraft(matchId: number, field: "homeScore" | "awayScore" | "penaltyWinnerId", value: string) {
+  function updateDraft(matchId: string, field: "homeScore" | "awayScore" | "penaltyWinnerId", value: string) {
     setScoreDrafts((current) => ({
       ...current,
       [matchId]: {
@@ -123,9 +123,9 @@ export default function PredictionsPage({ params }: PageProps) {
     if (!user) return;
     try {
       const saved = await saveAwardPrediction(slug, {
-        championTeamId: awardDraft.championTeamId ? Number(awardDraft.championTeamId) : null,
-        runnerUpTeamId: awardDraft.runnerUpTeamId ? Number(awardDraft.runnerUpTeamId) : null,
-        thirdPlaceTeamId: awardDraft.thirdPlaceTeamId ? Number(awardDraft.thirdPlaceTeamId) : null,
+        championTeamId: awardDraft.championTeamId || null,
+        runnerUpTeamId: awardDraft.runnerUpTeamId || null,
+        thirdPlaceTeamId: awardDraft.thirdPlaceTeamId || null,
         topScorer: awardDraft.topScorer,
         bestPlayer: awardDraft.bestPlayer,
       });
@@ -146,7 +146,8 @@ export default function PredictionsPage({ params }: PageProps) {
       matchId: match.id,
       homeScore: Number(form.get("homeScore")),
       awayScore: Number(form.get("awayScore")),
-      penaltyWinnerTeamId: penaltyWinnerTeamId ? Number(penaltyWinnerTeamId) : null,
+      penaltyWinnerTeamId:
+        typeof penaltyWinnerTeamId === "string" && penaltyWinnerTeamId ? penaltyWinnerTeamId : null,
     });
 
     setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
@@ -304,9 +305,9 @@ export default function PredictionsPage({ params }: PageProps) {
 
       {(() => {
         // Group matches: stage → round (ordered by round.number)
-        type RoundSection = { roundId: number; roundNumber: number; matches: Match[] };
+        type RoundSection = { roundId: string; roundNumber: number; matches: Match[] };
         type StageSection = {
-          stageId: number;
+          stageId: string;
           stageName: string;
           stageType: string;
           rounds: RoundSection[];
@@ -315,7 +316,7 @@ export default function PredictionsPage({ params }: PageProps) {
         const STAGE_COLORS: Record<string, string> = { knockout: "purple", league: "teal", group: "blue" };
 
         function buildStageMap(matchList: Match[]) {
-          const map = new Map<number, StageSection>();
+          const map = new Map<string, StageSection>();
           for (const match of matchList) {
             if (!map.has(match.stage.id)) {
               map.set(match.stage.id, {
@@ -418,7 +419,7 @@ export default function PredictionsPage({ params }: PageProps) {
           );
         }
 
-        function renderStageSections(map: Map<number, StageSection>) {
+        function renderStageSections(map: Map<string, StageSection>) {
           return [...map.values()].map((section) => (
             <Collapsible.Root key={section.stageId} defaultOpen>
               <Collapsible.Trigger asChild>

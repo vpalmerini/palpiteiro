@@ -18,7 +18,7 @@ class MatchStub:
     home_score: int
     away_score: int
     went_to_penalties: bool = False
-    penalty_winner_team_id: int | None = None
+    penalty_winner_team_id: str | None = None
 
 
 @dataclass
@@ -26,7 +26,7 @@ class PredictionStub:
     predicted_home_score: int
     predicted_away_score: int
     predicts_penalties: bool = False
-    predicted_penalty_winner_team_id: int | None = None
+    predicted_penalty_winner_team_id: str | None = None
 
 
 def test_exact_score_gets_full_points():
@@ -53,8 +53,8 @@ def test_outcome_and_one_team_goal_can_stack():
 
 def test_penalty_bonus_requires_penalty_winner():
     score = calculate_prediction_score(
-        PredictionStub(1, 1, True, 10),
-        MatchStub(1, 1, True, 10),
+        PredictionStub(1, 1, True, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+        MatchStub(1, 1, True, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         PoolStub(),
     )
 

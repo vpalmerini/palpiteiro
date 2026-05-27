@@ -45,7 +45,7 @@ export default function PoolPage({ params }: PageProps) {
   const [pool, setPool] = useState<Pool | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
-  const [predictedMatchIds, setPredictedMatchIds] = useState<Set<number>>(new Set());
+  const [predictedMatchIds, setPredictedMatchIds] = useState<Set<string>>(new Set());
   const [snapshots, setSnapshots] = useState<RoundSnapshot[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);

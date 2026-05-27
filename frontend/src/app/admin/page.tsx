@@ -52,7 +52,7 @@ import {
   adminUpdateTournamentStatus,
   ordinalRound,
 } from "@/lib/api";
-import type { AdminPool, Match, Round, Stage, Team, TournamentGroup, TournamentTeamEntry, Tournament, TournamentStatus } from "@/types";
+import type { AdminPool, EntityId, Match, Round, Stage, Team, TournamentGroup, TournamentTeamEntry, Tournament, TournamentStatus } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Tournament selector
@@ -65,8 +65,8 @@ function TournamentSidebar({
   onCreated,
 }: {
   tournaments: Tournament[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
+  selectedId: EntityId | null;
+  onSelect: (id: EntityId) => void;
   onCreated: (t: Tournament) => void;
 }) {
   const [name, setName] = useState("");
@@ -171,16 +171,16 @@ function TournamentTeamsPanel({
   onCreated,
   onTeamGroupChanged,
 }: {
-  tournamentId: number;
+  tournamentId: EntityId;
   allTeams: Team[];
   tournamentTeams: TournamentTeamEntry[];
   isFinished: boolean;
   onAdded: (t: TournamentTeamEntry) => void;
-  onRemoved: (teamId: number) => void;
+  onRemoved: (teamId: EntityId) => void;
   onCreated: (t: Team) => void;
   onTeamGroupChanged: (entry: TournamentTeamEntry) => void;
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<EntityId>>(new Set());
   const [addError, setAddError] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
 
@@ -192,7 +192,7 @@ function TournamentTeamsPanel({
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
 
-  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [editingTeamId, setEditingTeamId] = useState<EntityId | null>(null);
   const [editFlagCode, setEditFlagCode] = useState("");
   const [editLogoUrl, setEditLogoUrl] = useState("");
   const [editLoading, setEditLoading] = useState(false);
@@ -206,7 +206,7 @@ function TournamentTeamsPanel({
   const assignedIds = new Set(tournamentTeams.map((t) => t.id));
   const available = allTeams.filter((t) => !assignedIds.has(t.id));
 
-  function toggleSelect(teamId: number) {
+  function toggleSelect(teamId: EntityId) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(teamId) ? next.delete(teamId) : next.add(teamId);
@@ -232,7 +232,7 @@ function TournamentTeamsPanel({
     }
   }
 
-  async function handleRemove(teamId: number) {
+  async function handleRemove(teamId: EntityId) {
     try {
       await adminRemoveTournamentTeam(tournamentId, teamId);
       onRemoved(teamId);
@@ -274,7 +274,7 @@ function TournamentTeamsPanel({
     setEditLogoUrl(t.logoUrl ?? "");
   }
 
-  async function saveEdit(teamId: number) {
+  async function saveEdit(teamId: EntityId) {
     setEditLoading(true);
     try {
       const updated = await adminUpdateTeam(teamId, {
@@ -349,7 +349,7 @@ function TournamentTeamsPanel({
                           value={t.groupId != null ? String(t.groupId) : ""}
                           onChange={async (e) => {
                             const val = e.target.value;
-                            const updated = await adminAssignTeamGroup(tournamentId, t.id, val ? Number(val) : null);
+                            const updated = await adminAssignTeamGroup(tournamentId, t.id, val || null);
                             onTeamGroupChanged(updated);
                           }}
                         >
@@ -533,19 +533,19 @@ function StagesPanel({
   onUpdated,
   onDeleted,
 }: {
-  tournamentId: number;
+  tournamentId: EntityId;
   stages: Stage[];
   isFinished: boolean;
   onCreated: (s: Stage) => void;
   onUpdated: (s: Stage) => void;
-  onDeleted: (stageId: number) => void;
+  onDeleted: (stageId: EntityId) => void;
 }) {
   const [name, setName] = useState("");
   const [order, setOrder] = useState(String(stages.length + 1));
   const [stageType, setStageType] = useState("group");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<EntityId | null>(null);
   const [editName, setEditName] = useState("");
   const [editOrder, setEditOrder] = useState("");
   const [editStageType, setEditStageType] = useState("group");
@@ -578,7 +578,7 @@ function StagesPanel({
     setEditStageType(stage.stageType);
   }
 
-  async function saveEdit(stageId: number) {
+  async function saveEdit(stageId: EntityId) {
     try {
       const s = await adminUpdateStage(stageId, {
         name: editName.trim(),
@@ -748,7 +748,7 @@ function GroupsSubPanel({
   const [groups, setGroups] = useState<TournamentGroup[]>(stage.groups);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<EntityId | null>(null);
   const [editName, setEditName] = useState("");
 
   function sync(updated: TournamentGroup[]) {
@@ -770,13 +770,13 @@ function GroupsSubPanel({
     }
   }
 
-  async function handleDelete(groupId: number) {
+  async function handleDelete(groupId: EntityId) {
     if (!confirm("Deletar este grupo? Os times serão desassociados.")) return;
     await adminDeleteGroup(groupId);
     sync(groups.filter((g) => g.id !== groupId));
   }
 
-  async function handleRename(groupId: number) {
+  async function handleRename(groupId: EntityId) {
     if (!editName.trim()) return;
     const g = await adminRenameGroup(groupId, { name: editName.trim() });
     sync(groups.map((x) => (x.id === groupId ? g : x)));
@@ -843,10 +843,10 @@ function RoundsSubPanel({
   const [rounds, setRounds] = useState<Round[]>(stage.rounds);
   const [newNumber, setNewNumber] = useState("");
   const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<EntityId | null>(null);
   const [editNumber, setEditNumber] = useState("");
-  const [snapshotting, setSnapshotting] = useState<number | null>(null);
-  const [snapshotDone, setSnapshotDone] = useState<Record<number, string>>({});
+  const [snapshotting, setSnapshotting] = useState<EntityId | null>(null);
+  const [snapshotDone, setSnapshotDone] = useState<Record<EntityId, string>>({});
 
   function sync(updated: Round[]) {
     const sorted = [...updated].sort((a, b) => a.number - b.number);
@@ -868,13 +868,13 @@ function RoundsSubPanel({
     }
   }
 
-  async function handleDelete(roundId: number) {
+  async function handleDelete(roundId: EntityId) {
     if (!confirm("Deletar esta rodada? Todos os jogos associados serão removidos.")) return;
     await adminDeleteRound(roundId);
     sync(rounds.filter((r) => r.id !== roundId));
   }
 
-  async function handleRenumber(roundId: number) {
+  async function handleRenumber(roundId: EntityId) {
     const num = parseInt(editNumber, 10);
     if (isNaN(num)) return;
     const r = await adminUpdateRound(roundId, { number: num });
@@ -1002,7 +1002,7 @@ function MatchRow({
   teams: Team[];
   isFinished: boolean;
   onUpdated: (m: Match) => void;
-  onDeleted: (matchId: number) => void;
+  onDeleted: (matchId: EntityId) => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
@@ -1021,7 +1021,7 @@ function MatchRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedStageForEdit = stages.find((s) => s.id === Number(draft.stageId));
+  const selectedStageForEdit = stages.find((s) => s.id === draft.stageId);
   const roundsForEdit = selectedStageForEdit?.rounds ?? [];
   const currentStage = stages.find((s) => s.id === match.stage.id);
   const isResultDraw =
@@ -1036,9 +1036,9 @@ function MatchRow({
     setSaving(true);
     try {
       const updated = await adminUpdateMatch(match.id, {
-        roundId: Number(draft.roundId),
-        homeTeamId: draft.homeTeamId ? Number(draft.homeTeamId) : null,
-        awayTeamId: draft.awayTeamId ? Number(draft.awayTeamId) : null,
+        roundId: draft.roundId,
+        homeTeamId: draft.homeTeamId || null,
+        awayTeamId: draft.awayTeamId || null,
         startsAt: new Date(draft.startsAt).toISOString(),
       });
       onUpdated(updated);
@@ -1060,7 +1060,7 @@ function MatchRow({
         awayScore: Number(result.awayScore),
       };
       if (isResultDraw) {
-        payload.penaltyWinnerTeamId = result.penaltyWinnerId ? Number(result.penaltyWinnerId) : null;
+        payload.penaltyWinnerTeamId = result.penaltyWinnerId || null;
       }
       const updated = await adminUpdateMatch(match.id, payload);
       onUpdated(updated);
@@ -1277,14 +1277,14 @@ function MatchesPanel({
   onUpdated,
   onDeleted,
 }: {
-  tournamentId: number;
+  tournamentId: EntityId;
   matches: Match[];
   stages: Stage[];
   teams: Team[];
   isFinished: boolean;
   onCreated: (m: Match) => void;
   onUpdated: (m: Match) => void;
-  onDeleted: (matchId: number) => void;
+  onDeleted: (matchId: EntityId) => void;
 }) {
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<MatchDraft>({
@@ -1297,7 +1297,7 @@ function MatchesPanel({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const selectedStage = stages.find((s) => s.id === Number(draft.stageId));
+  const selectedStage = stages.find((s) => s.id === draft.stageId);
   const availableRounds = selectedStage?.rounds ?? [];
 
   async function handleCreate(event: FormEvent) {
@@ -1306,10 +1306,10 @@ function MatchesPanel({
     setSubmitting(true);
     try {
       const m = await adminCreateMatch(tournamentId, {
-        roundId: Number(draft.roundId),
+        roundId: draft.roundId,
         startsAt: new Date(draft.startsAt).toISOString(),
-        homeTeamId: draft.homeTeamId ? Number(draft.homeTeamId) : null,
-        awayTeamId: draft.awayTeamId ? Number(draft.awayTeamId) : null,
+        homeTeamId: draft.homeTeamId || null,
+        awayTeamId: draft.awayTeamId || null,
       });
       onCreated(m);
       setNewOpen(false);
@@ -1322,7 +1322,7 @@ function MatchesPanel({
   }
 
   const sorted = [...matches].sort((a, b) => {
-    if (a.stage.id !== b.stage.id) return a.stage.id - b.stage.id;
+    if (a.stage.id !== b.stage.id) return a.stage.name.localeCompare(b.stage.name);
     if (a.round.number !== b.round.number) return a.round.number - b.round.number;
     return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
   });
@@ -1348,7 +1348,7 @@ function MatchesPanel({
                     <NativeSelect.Field
                       value={draft.stageId}
                       onChange={(e) => {
-                        const stg = stages.find((s) => s.id === Number(e.target.value));
+                        const stg = stages.find((s) => s.id === e.target.value);
                         setDraft((d) => ({ ...d, stageId: e.target.value, roundId: stg?.rounds[0] ? String(stg.rounds[0].id) : "" }));
                       }}
                     >
@@ -1573,9 +1573,9 @@ function AwardsPanel({
     setSaving(true);
     try {
       const updated = await adminUpdateTournamentAwards(tournament.id, {
-        championTeamId: draft.championTeamId ? Number(draft.championTeamId) : null,
-        runnerUpTeamId: draft.runnerUpTeamId ? Number(draft.runnerUpTeamId) : null,
-        thirdPlaceTeamId: draft.thirdPlaceTeamId ? Number(draft.thirdPlaceTeamId) : null,
+        championTeamId: draft.championTeamId || null,
+        runnerUpTeamId: draft.runnerUpTeamId || null,
+        thirdPlaceTeamId: draft.thirdPlaceTeamId || null,
         topScorer: draft.topScorer || "",
         bestPlayer: draft.bestPlayer || "",
       });
@@ -1800,7 +1800,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<EntityId | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
