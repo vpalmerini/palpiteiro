@@ -214,6 +214,20 @@ class Match(TimestampSoftDeleteMixin, db.Model):
         return self.round.stage
 
     __table_args__ = (
+        Index(
+            "ix_matches_tournament_starts_at_active",
+            "tournament_id",
+            "starts_at",
+            postgresql_where=ACTIVE_ONLY,
+            sqlite_where=ACTIVE_ONLY,
+        ),
+        Index(
+            "ix_matches_tournament_status_active",
+            "tournament_id",
+            "status",
+            postgresql_where=ACTIVE_ONLY,
+            sqlite_where=ACTIVE_ONLY,
+        ),
         db.CheckConstraint(
             "home_team_id IS NULL OR away_team_id IS NULL OR home_team_id != away_team_id",
             name="ck_match_teams_differ",
@@ -346,6 +360,13 @@ class Prediction(TimestampSoftDeleteMixin, db.Model):
     match = db.relationship("Match", backref=db.backref("predictions", passive_deletes=True))
     predicted_penalty_winner = db.relationship("Team", foreign_keys=[predicted_penalty_winner_team_id])
     __table_args__ = (
+        Index(
+            "ix_predictions_pool_match_active",
+            "pool_id",
+            "match_id",
+            postgresql_where=ACTIVE_ONLY,
+            sqlite_where=ACTIVE_ONLY,
+        ),
         active_unique_index("uq_prediction_per_match_active", "pool_id", "user_id", "match_id"),
         db.CheckConstraint("predicted_home_score >= 0", name="ck_prediction_home_score_positive"),
         db.CheckConstraint("predicted_away_score >= 0", name="ck_prediction_away_score_positive"),
