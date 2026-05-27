@@ -29,10 +29,10 @@ import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChar
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { getMatches, getPool, getPredictions, getPoolSnapshots, getRanking, joinPool, ordinalRound } from "@/lib/api";
+import { getPoolDetail, getRanking, joinPool, ordinalRound } from "@/lib/api";
 import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
-import type { Match, Pool, Prediction, RankingEntry, RoundSnapshot } from "@/types";
+import type { Match, Pool, RankingEntry, RoundSnapshot } from "@/types";
 import { useAuth } from "@/contexts/auth";
 
 type PageProps = {
@@ -56,23 +56,14 @@ export default function PoolPage({ params }: PageProps) {
 
   useEffect(() => {
     if (!slug) return;
-    void Promise.all([getPool(slug), getMatches(slug), getRanking(slug)]).then(
-      ([poolData, matchData, rankingData]) => {
-        setPool(poolData);
-        setMatches(matchData);
-        setRanking(rankingData);
-      },
-    );
-    void getPoolSnapshots(slug).then(setSnapshots);
+    void getPoolDetail(slug).then((data) => {
+      setPool(data.pool);
+      setMatches(data.matches);
+      setRanking(data.ranking);
+      setSnapshots(data.snapshots);
+      setPredictedMatchIds(new Set(data.predictedMatchIds));
+    });
   }, [slug]);
-
-  // Fetch predictions whenever user or pool membership changes
-  useEffect(() => {
-    if (!slug || !user || !pool?.isParticipant) return;
-    void getPredictions(slug).then((preds) =>
-      setPredictedMatchIds(new Set(preds.map((p) => p.matchId))),
-    );
-  }, [slug, user, pool?.isParticipant]);
 
   // ── Timeline chart data ────────────────────────────────────────────────────
   const { chartData, participants, stageNames } = useMemo(() => {
@@ -126,6 +117,7 @@ export default function PoolPage({ params }: PageProps) {
     });
     setPool(result.pool);
     setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
+    setPredictedMatchIds(new Set());
     setRanking(await getRanking(slug));
   }
 

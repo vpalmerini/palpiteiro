@@ -101,6 +101,18 @@ export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
 }
 
+export type PoolDetail = {
+  pool: Pool;
+  matches: Match[];
+  ranking: RankingEntry[];
+  snapshots: RoundSnapshot[];
+  predictedMatchIds: string[];
+};
+
+export function getPoolDetail(slug: string) {
+  return request<PoolDetail>(`/pools/${slug}/detail`);
+}
+
 export type PredictionSetup = {
   pool: Pool;
   matches: Match[];

@@ -203,17 +203,18 @@ def _match_payload(match: Match, team_group_map: dict | None = None):
     }
 
 
-def _pool_payload(pool: Pool):
+def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
     prizes = sorted(
         (prize for prize in pool.prizes if prize.deleted_at is None),
         key=lambda prize: prize.position,
     )
-    current_user = g.get("current_user") or get_current_user()
-    is_participant = False
-    if current_user:
-        is_participant = PoolParticipant.active().filter_by(
-            pool_id=pool.id, user_id=current_user.id
-        ).first() is not None
+    if is_participant is None:
+        current_user = g.get("current_user") or get_current_user()
+        is_participant = False
+        if current_user:
+            is_participant = PoolParticipant.active().filter_by(
+                pool_id=pool.id, user_id=current_user.id
+            ).first() is not None
     return {
         "id": pool.id,
         "slug": pool.slug,
@@ -486,6 +487,34 @@ def get_pool(slug):
     return jsonify(_pool_payload(_pool_or_404(slug)))
 
 
+@api.get("/pools/<slug>/detail")
+def get_pool_detail(slug):
+    """Single round-trip bootstrap for the pool detail page."""
+    pool = _pool_or_404(slug)
+    _ensure_creator_membership(pool)
+
+    current_user = g.get("current_user") or get_current_user()
+    is_participant = False
+    predicted_match_ids: list[str] = []
+    if current_user:
+        is_participant = PoolParticipant.active().filter_by(
+            pool_id=pool.id, user_id=current_user.id
+        ).first() is not None
+        if is_participant:
+            predicted_match_ids = _predicted_match_ids(pool, current_user.id)
+
+    ranking = _build_ranking(pool, recalculate=False)
+    db.session.commit()
+
+    return jsonify({
+        "pool": _pool_payload(pool, is_participant=is_participant),
+        "matches": _list_pool_matches_payload(pool),
+        "ranking": [{k: v for k, v in e.items()} for e in ranking],
+        "snapshots": _list_pool_snapshots_payload(pool),
+        "predictedMatchIds": predicted_match_ids,
+    })
+
+
 @api.post("/pools/<slug>/join")
 @require_auth
 def join_pool(slug):
@@ -528,6 +557,32 @@ def _list_pool_matches_payload(pool: Pool) -> list[dict]:
     )
     tgm = _build_team_group_map(pool.tournament_id)
     return [_match_payload(m, tgm) for m in matches]
+
+
+def _predicted_match_ids(pool: Pool, user_id: str) -> list[str]:
+    rows = (
+        Prediction.active()
+        .filter_by(pool_id=pool.id, user_id=user_id)
+        .with_entities(Prediction.match_id)
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _list_pool_snapshots_payload(pool: Pool) -> list[dict]:
+    snapshots = (
+        RoundSnapshot.active()
+        .filter_by(pool_id=pool.id)
+        .join(Round, RoundSnapshot.round_id == Round.id)
+        .join(Stage, Stage.id == Round.stage_id)
+        .options(
+            contains_eager(RoundSnapshot.round).contains_eager(Round.stage),
+            selectinload(RoundSnapshot.entries).joinedload(RoundSnapshotEntry.user),
+        )
+        .order_by(Stage.order, Round.number)
+        .all()
+    )
+    return [_snapshot_payload(s) for s in snapshots]
 
 
 def _list_user_predictions_payload(pool: Pool, user_id: str) -> list[dict]:
@@ -815,19 +870,7 @@ def _snapshot_payload(snapshot: RoundSnapshot) -> dict:
 @api.get("/pools/<slug>/snapshots")
 def list_pool_snapshots(slug):
     pool = _pool_or_404(slug)
-    snapshots = (
-        RoundSnapshot.active()
-        .filter_by(pool_id=pool.id)
-        .join(Round, RoundSnapshot.round_id == Round.id)
-        .join(Stage, Stage.id == Round.stage_id)
-        .options(
-            contains_eager(RoundSnapshot.round).contains_eager(Round.stage),
-            selectinload(RoundSnapshot.entries).joinedload(RoundSnapshotEntry.user),
-        )
-        .order_by(Stage.order, Round.number)
-        .all()
-    )
-    return jsonify([_snapshot_payload(s) for s in snapshots])
+    return jsonify(_list_pool_snapshots_payload(pool))
 
 
 @api.post("/admin/seed")
