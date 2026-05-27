@@ -113,7 +113,7 @@ def test_ranking_backfills_creator_for_existing_empty_pool():
             },
         ).get_json()
 
-        db.session.execute(db.text("delete from pool_participant"))
+        db.session.execute(db.text("delete from pool_participants"))
         db.session.execute(db.text("delete from participant"))
         db.session.commit()
 

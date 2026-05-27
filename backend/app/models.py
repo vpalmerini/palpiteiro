@@ -38,6 +38,8 @@ class StageType(str, Enum):
 
 class User(TimestampSoftDeleteMixin, db.Model):
     """Authenticated account."""
+    __tablename__ = "users"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     google_id = db.Column(db.String(128), nullable=False, index=True)
     email = db.Column(db.String(255), nullable=False, index=True)
@@ -55,14 +57,16 @@ class User(TimestampSoftDeleteMixin, db.Model):
 # ── Tournament / Teams ────────────────────────────────────────────────────────
 
 class Tournament(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "tournaments"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(160), nullable=False)
     year = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(24), nullable=False, default=TournamentStatus.ONGOING.value)
     starts_at = db.Column(db.DateTime(timezone=True), nullable=True)
-    champion_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
-    runner_up_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
-    third_place_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    champion_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    runner_up_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    third_place_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     top_scorer = db.Column(db.String(120), nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
 
@@ -76,6 +80,8 @@ class Tournament(TimestampSoftDeleteMixin, db.Model):
 
 
 class Team(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "teams"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(120), nullable=False)
     short_name = db.Column(db.String(12), nullable=True)
@@ -85,10 +91,12 @@ class Team(TimestampSoftDeleteMixin, db.Model):
 
 
 class TournamentGroup(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "tournament_groups"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
         UUID,
-        db.ForeignKey("stage.id", ondelete="CASCADE"),
+        db.ForeignKey("stages.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -99,12 +107,14 @@ class TournamentGroup(TimestampSoftDeleteMixin, db.Model):
 
 
 class TournamentTeam(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "tournament_teams"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
-    tournament_id = db.Column(UUID, db.ForeignKey("tournament.id"), nullable=False)
-    team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=False, index=True)
+    tournament_id = db.Column(UUID, db.ForeignKey("tournaments.id"), nullable=False)
+    team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=False, index=True)
     group_id = db.Column(
         UUID,
-        db.ForeignKey("tournament_group.id", ondelete="SET NULL"),
+        db.ForeignKey("tournament_groups.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -118,10 +128,12 @@ class TournamentTeam(TimestampSoftDeleteMixin, db.Model):
 # ── Stages / Rounds / Matches ─────────────────────────────────────────────────
 
 class Stage(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "stages"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
         UUID,
-        db.ForeignKey("tournament.id", ondelete="CASCADE"),
+        db.ForeignKey("tournaments.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -145,10 +157,12 @@ class Stage(TimestampSoftDeleteMixin, db.Model):
 
 
 class Round(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "rounds"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
         UUID,
-        db.ForeignKey("stage.id", ondelete="CASCADE"),
+        db.ForeignKey("stages.id", ondelete="CASCADE"),
         nullable=False,
     )
     number = db.Column(db.Integer, nullable=False)
@@ -158,28 +172,30 @@ class Round(TimestampSoftDeleteMixin, db.Model):
 
 
 class Match(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "matches"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
         UUID,
-        db.ForeignKey("tournament.id"),
+        db.ForeignKey("tournaments.id"),
         nullable=False,
         index=True,
     )
     round_id = db.Column(
         UUID,
-        db.ForeignKey("round.id", ondelete="CASCADE"),
+        db.ForeignKey("rounds.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    home_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
-    away_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    home_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    away_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     starts_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
     venue = db.Column(db.String(120), nullable=True)
     status = db.Column(db.String(24), nullable=False, default=MatchStatus.SCHEDULED.value, index=True)
     home_score = db.Column(db.Integer, nullable=True)
     away_score = db.Column(db.Integer, nullable=True)
     went_to_penalties = db.Column(db.Boolean, nullable=False, default=False)
-    penalty_winner_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    penalty_winner_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
 
     tournament = db.relationship("Tournament", backref="matches")
     round = db.relationship("Round", backref=db.backref("matches", passive_deletes=True))
@@ -208,6 +224,8 @@ class Match(TimestampSoftDeleteMixin, db.Model):
 # ── Pools ─────────────────────────────────────────────────────────────────────
 
 class Pool(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "pools"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     slug = db.Column(db.String(64), nullable=False, index=True)
     name = db.Column(db.String(160), nullable=False)
@@ -215,13 +233,13 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
     creator_name = db.Column(db.String(120), nullable=False)
     creator_user_id = db.Column(
         UUID,
-        db.ForeignKey("user.id"),
+        db.ForeignKey("users.id"),
         nullable=True,
         index=True,
     )
     tournament_id = db.Column(
         UUID,
-        db.ForeignKey("tournament.id"),
+        db.ForeignKey("tournaments.id"),
         nullable=False,
         index=True,
     )
@@ -247,10 +265,12 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
 
 
 class PoolPrize(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "pool_prizes"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
-        db.ForeignKey("pool.id", ondelete="CASCADE"),
+        db.ForeignKey("pools.id", ondelete="CASCADE"),
         nullable=False,
     )
     position = db.Column(db.Integer, nullable=False)
@@ -264,15 +284,17 @@ class PoolPrize(TimestampSoftDeleteMixin, db.Model):
 
 
 class PoolParticipant(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "pool_participants"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
-        db.ForeignKey("pool.id", ondelete="CASCADE"),
+        db.ForeignKey("pools.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
         UUID,
-        db.ForeignKey("user.id"),
+        db.ForeignKey("users.id"),
         nullable=False,
         index=True,
     )
@@ -288,28 +310,30 @@ class PoolParticipant(TimestampSoftDeleteMixin, db.Model):
 # ── Predictions & Scoring ─────────────────────────────────────────────────────
 
 class Prediction(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "predictions"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
-        db.ForeignKey("pool.id", ondelete="CASCADE"),
+        db.ForeignKey("pools.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
         UUID,
-        db.ForeignKey("user.id"),
+        db.ForeignKey("users.id"),
         nullable=False,
         index=True,
     )
     match_id = db.Column(
         UUID,
-        db.ForeignKey("match.id", ondelete="CASCADE"),
+        db.ForeignKey("matches.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     predicted_home_score = db.Column(db.Integer, nullable=False)
     predicted_away_score = db.Column(db.Integer, nullable=False)
     predicts_penalties = db.Column(db.Boolean, nullable=False, default=False)
-    predicted_penalty_winner_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True)
+    predicted_penalty_winner_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True)
 
     pool = db.relationship("Pool", backref=db.backref("predictions", passive_deletes=True))
     user = db.relationship("User", backref="predictions")
@@ -323,10 +347,12 @@ class Prediction(TimestampSoftDeleteMixin, db.Model):
 
 
 class ScoreEntry(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "score_entries"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     prediction_id = db.Column(
         UUID,
-        db.ForeignKey("prediction.id", ondelete="CASCADE"),
+        db.ForeignKey("predictions.id", ondelete="CASCADE"),
         nullable=False,
     )
     points = db.Column(db.Integer, nullable=False)
@@ -346,21 +372,23 @@ class ScoreEntry(TimestampSoftDeleteMixin, db.Model):
 
 
 class AwardPrediction(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "award_predictions"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
-        db.ForeignKey("pool.id", ondelete="CASCADE"),
+        db.ForeignKey("pools.id", ondelete="CASCADE"),
         nullable=False,
     )
     user_id = db.Column(
         UUID,
-        db.ForeignKey("user.id"),
+        db.ForeignKey("users.id"),
         nullable=False,
         index=True,
     )
-    champion_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
-    runner_up_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
-    third_place_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
+    champion_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    runner_up_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    third_place_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     top_scorer = db.Column(db.String(120), nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
 
@@ -375,15 +403,17 @@ class AwardPrediction(TimestampSoftDeleteMixin, db.Model):
 # ── Ranking Snapshots ─────────────────────────────────────────────────────────
 
 class RoundSnapshot(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "round_snapshots"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     round_id = db.Column(
         UUID,
-        db.ForeignKey("round.id", ondelete="CASCADE"),
+        db.ForeignKey("rounds.id", ondelete="CASCADE"),
         nullable=False,
     )
     pool_id = db.Column(
         UUID,
-        db.ForeignKey("pool.id", ondelete="CASCADE"),
+        db.ForeignKey("pools.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -400,16 +430,18 @@ class RoundSnapshot(TimestampSoftDeleteMixin, db.Model):
 
 
 class RoundSnapshotEntry(TimestampSoftDeleteMixin, db.Model):
+    __tablename__ = "round_snapshot_entries"
+
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     snapshot_id = db.Column(
         UUID,
-        db.ForeignKey("round_snapshot.id", ondelete="CASCADE"),
+        db.ForeignKey("round_snapshots.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     user_id = db.Column(
         UUID,
-        db.ForeignKey("user.id"),
+        db.ForeignKey("users.id"),
         nullable=False,
         index=True,
     )
