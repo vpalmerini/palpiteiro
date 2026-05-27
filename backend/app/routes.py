@@ -441,9 +441,7 @@ def create_pool():
     if tournament is None:
         abort(404, description="tournament not found")
 
-    slug = token_urlsafe(8)
-    while Pool.active().filter_by(slug=slug).first() is not None:
-        slug = token_urlsafe(8)
+    slug = token_urlsafe(12)
 
     scoring = data.get("scoring") or {}
     awards_cfg = data.get("awards") or {}
@@ -494,9 +492,7 @@ def create_pool():
     db.session.add(PoolParticipant(pool_id=pool.id, user_id=user.id, display_name=creator_display_name))
 
     db.session.commit()
-    payload = _pool_payload(pool)
-    payload["creatorDisplayName"] = creator_display_name
-    return jsonify(payload), 201
+    return jsonify({"id": pool.id, "slug": pool.slug}), 201
 
 
 @api.get("/pools/<slug>")

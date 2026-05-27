@@ -76,6 +76,11 @@ export function logout() {
 
 export type AwardConfigPayload = { enabled: boolean; points: number };
 
+export type CreatedPool = {
+  id: EntityId;
+  slug: string;
+};
+
 export function createPool(payload: {
   tournamentId: EntityId;
   name: string;
@@ -91,7 +96,7 @@ export function createPool(payload: {
     bestPlayer: AwardConfigPayload;
   };
 }) {
-  return request<Pool & { creatorDisplayName: string }>("/pools", {
+  return request<CreatedPool>("/pools", {
     method: "POST",
     body: JSON.stringify(payload),
   });
