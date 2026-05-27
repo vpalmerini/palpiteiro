@@ -3,12 +3,9 @@ from enum import Enum
 from uuid import uuid4
 
 from .extensions import db
+from .model_mixins import TimestampSoftDeleteMixin, active_unique_index, utc_now
 
 UUID = db.String(36)
-
-
-def utc_now():
-    return datetime.now(timezone.utc)
 
 
 def _uuid4_str():
@@ -39,21 +36,25 @@ class StageType(str, Enum):
 
 # ── Auth / Identity ──────────────────────────────────────────────────────────
 
-class User(db.Model):
+class User(TimestampSoftDeleteMixin, db.Model):
     """Authenticated account."""
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
-    google_id = db.Column(db.String(128), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    google_id = db.Column(db.String(128), nullable=False, index=True)
+    email = db.Column(db.String(255), nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     picture_url = db.Column(db.String(512), nullable=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        active_unique_index("uq_user_google_id_active", "google_id"),
+        active_unique_index("uq_user_email_active", "email"),
+    )
 
 
 # ── Tournament / Teams ────────────────────────────────────────────────────────
 
-class Tournament(db.Model):
+class Tournament(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(160), nullable=False)
     year = db.Column(db.Integer, nullable=False)
@@ -70,11 +71,11 @@ class Tournament(db.Model):
     third_place = db.relationship("Team", foreign_keys=[third_place_team_id])
 
     __table_args__ = (
-        db.UniqueConstraint("name", "year", name="uq_tournament_name_year"),
+        active_unique_index("uq_tournament_name_year_active", "name", "year"),
     )
 
 
-class Team(db.Model):
+class Team(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     name = db.Column(db.String(120), nullable=False)
     short_name = db.Column(db.String(12), nullable=True)
@@ -83,7 +84,7 @@ class Team(db.Model):
     logo_url = db.Column(db.String(500), nullable=True)
 
 
-class TournamentGroup(db.Model):
+class TournamentGroup(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
         UUID,
@@ -94,10 +95,10 @@ class TournamentGroup(db.Model):
     name = db.Column(db.String(40), nullable=False)
 
     stage = db.relationship("Stage", backref=db.backref("groups", passive_deletes=True))
-    __table_args__ = (db.UniqueConstraint("stage_id", "name", name="uq_group_name"),)
+    __table_args__ = (active_unique_index("uq_group_name_active", "stage_id", "name"),)
 
 
-class TournamentTeam(db.Model):
+class TournamentTeam(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(UUID, db.ForeignKey("tournament.id"), nullable=False)
     team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=False, index=True)
@@ -111,12 +112,12 @@ class TournamentTeam(db.Model):
     tournament = db.relationship("Tournament", backref="tournament_teams")
     team = db.relationship("Team", backref="tournament_teams")
     group = db.relationship("TournamentGroup", backref="team_assignments")
-    __table_args__ = (db.UniqueConstraint("tournament_id", "team_id", name="uq_tournament_team"),)
+    __table_args__ = (active_unique_index("uq_tournament_team_active", "tournament_id", "team_id"),)
 
 
 # ── Stages / Rounds / Matches ─────────────────────────────────────────────────
 
-class Stage(db.Model):
+class Stage(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
         UUID,
@@ -138,12 +139,12 @@ class Stage(db.Model):
         return self.stage_type == StageType.KNOCKOUT.value
 
     __table_args__ = (
-        db.UniqueConstraint("tournament_id", "order", name="uq_stage_order"),
-        db.UniqueConstraint("tournament_id", "name", name="uq_stage_name"),
+        active_unique_index("uq_stage_order_active", "tournament_id", "order"),
+        active_unique_index("uq_stage_name_active", "tournament_id", "name"),
     )
 
 
-class Round(db.Model):
+class Round(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     stage_id = db.Column(
         UUID,
@@ -153,10 +154,10 @@ class Round(db.Model):
     number = db.Column(db.Integer, nullable=False)
 
     stage = db.relationship("Stage", backref=db.backref("rounds", passive_deletes=True))
-    __table_args__ = (db.UniqueConstraint("stage_id", "number", name="uq_round_number"),)
+    __table_args__ = (active_unique_index("uq_round_number_active", "stage_id", "number"),)
 
 
-class Match(db.Model):
+class Match(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     tournament_id = db.Column(
         UUID,
@@ -206,9 +207,9 @@ class Match(db.Model):
 
 # ── Pools ─────────────────────────────────────────────────────────────────────
 
-class Pool(db.Model):
+class Pool(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
-    slug = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(64), nullable=False, index=True)
     name = db.Column(db.String(160), nullable=False)
     description = db.Column(db.Text, nullable=True)
     creator_name = db.Column(db.String(120), nullable=False)
@@ -238,13 +239,14 @@ class Pool(db.Model):
     top_scorer_points = db.Column(db.Integer, nullable=False, default=10)
     predict_best_player = db.Column(db.Boolean, nullable=False, default=False)
     best_player_points = db.Column(db.Integer, nullable=False, default=10)
-    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     tournament = db.relationship("Tournament", backref="pools")
     creator = db.relationship("User", foreign_keys=[creator_user_id], backref="created_pools")
 
+    __table_args__ = (active_unique_index("uq_pool_slug_active", "slug"),)
 
-class PoolPrize(db.Model):
+
+class PoolPrize(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
@@ -256,12 +258,12 @@ class PoolPrize(db.Model):
 
     pool = db.relationship("Pool", backref=db.backref("prizes", passive_deletes=True))
     __table_args__ = (
-        db.UniqueConstraint("pool_id", "position", name="uq_pool_prize_position"),
+        active_unique_index("uq_pool_prize_position_active", "pool_id", "position"),
         db.CheckConstraint("position BETWEEN 1 AND 3", name="ck_pool_prize_position_range"),
     )
 
 
-class PoolParticipant(db.Model):
+class PoolParticipant(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
@@ -275,18 +277,17 @@ class PoolParticipant(db.Model):
         index=True,
     )
     display_name = db.Column(db.String(120), nullable=False)
-    joined_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     pool = db.relationship("Pool", backref=db.backref("memberships", passive_deletes=True))
     user = db.relationship("User", backref="memberships")
     __table_args__ = (
-        db.UniqueConstraint("pool_id", "user_id", name="uq_pool_user"),
+        active_unique_index("uq_pool_user_active", "pool_id", "user_id"),
     )
 
 
 # ── Predictions & Scoring ─────────────────────────────────────────────────────
 
-class Prediction(db.Model):
+class Prediction(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
@@ -309,33 +310,29 @@ class Prediction(db.Model):
     predicted_away_score = db.Column(db.Integer, nullable=False)
     predicts_penalties = db.Column(db.Boolean, nullable=False, default=False)
     predicted_penalty_winner_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
-    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
 
     pool = db.relationship("Pool", backref=db.backref("predictions", passive_deletes=True))
     user = db.relationship("User", backref="predictions")
     match = db.relationship("Match", backref=db.backref("predictions", passive_deletes=True))
     predicted_penalty_winner = db.relationship("Team", foreign_keys=[predicted_penalty_winner_team_id])
     __table_args__ = (
-        db.UniqueConstraint("pool_id", "user_id", "match_id", name="uq_prediction_per_match"),
+        active_unique_index("uq_prediction_per_match_active", "pool_id", "user_id", "match_id"),
         db.CheckConstraint("predicted_home_score >= 0", name="ck_prediction_home_score_positive"),
         db.CheckConstraint("predicted_away_score >= 0", name="ck_prediction_away_score_positive"),
     )
 
 
-class ScoreEntry(db.Model):
+class ScoreEntry(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     prediction_id = db.Column(
         UUID,
         db.ForeignKey("prediction.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
     )
     points = db.Column(db.Integer, nullable=False)
     exact_score = db.Column(db.Boolean, nullable=False, default=False)
     outcome_hit = db.Column(db.Boolean, nullable=False, default=False)
     penalty_hit = db.Column(db.Boolean, nullable=False, default=False)
-    calculated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     prediction = db.relationship(
         "Prediction",
@@ -343,11 +340,12 @@ class ScoreEntry(db.Model):
     )
 
     __table_args__ = (
+        active_unique_index("uq_score_entry_prediction_active", "prediction_id"),
         db.CheckConstraint("points >= 0", name="ck_score_entry_points_positive"),
     )
 
 
-class AwardPrediction(db.Model):
+class AwardPrediction(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     pool_id = db.Column(
         UUID,
@@ -365,19 +363,18 @@ class AwardPrediction(db.Model):
     third_place_team_id = db.Column(UUID, db.ForeignKey("team.id"), nullable=True, index=True)
     top_scorer = db.Column(db.String(120), nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
-    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
 
     pool = db.relationship("Pool", backref=db.backref("award_predictions", passive_deletes=True))
     user = db.relationship("User", backref="award_predictions")
     champion = db.relationship("Team", foreign_keys=[champion_team_id])
     runner_up = db.relationship("Team", foreign_keys=[runner_up_team_id])
     third_place = db.relationship("Team", foreign_keys=[third_place_team_id])
-    __table_args__ = (db.UniqueConstraint("pool_id", "user_id", name="uq_award_prediction"),)
+    __table_args__ = (active_unique_index("uq_award_prediction_active", "pool_id", "user_id"),)
 
 
 # ── Ranking Snapshots ─────────────────────────────────────────────────────────
 
-class RoundSnapshot(db.Model):
+class RoundSnapshot(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     round_id = db.Column(
         UUID,
@@ -390,7 +387,6 @@ class RoundSnapshot(db.Model):
         nullable=False,
         index=True,
     )
-    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     round = db.relationship("Round", backref=db.backref("snapshots", passive_deletes=True))
     pool = db.relationship("Pool", backref=db.backref("snapshots", passive_deletes=True))
@@ -400,10 +396,10 @@ class RoundSnapshot(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    __table_args__ = (db.UniqueConstraint("round_id", "pool_id", name="uq_snapshot_round_pool"),)
+    __table_args__ = (active_unique_index("uq_snapshot_round_pool_active", "round_id", "pool_id"),)
 
 
-class RoundSnapshotEntry(db.Model):
+class RoundSnapshotEntry(TimestampSoftDeleteMixin, db.Model):
     id = db.Column(UUID, primary_key=True, default=_uuid4_str)
     snapshot_id = db.Column(
         UUID,
@@ -428,7 +424,7 @@ class RoundSnapshotEntry(db.Model):
     user = db.relationship("User")
 
     __table_args__ = (
-        db.UniqueConstraint("snapshot_id", "user_id", name="uq_snapshot_entry_user"),
+        active_unique_index("uq_snapshot_entry_user_active", "snapshot_id", "user_id"),
         db.CheckConstraint("position >= 1", name="ck_snapshot_entry_position_positive"),
         db.CheckConstraint("points >= 0", name="ck_snapshot_entry_points_positive"),
     )

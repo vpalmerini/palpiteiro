@@ -34,7 +34,10 @@ def get_current_user():
         return None
     try:
         payload = jwt.decode(token, _secret(), algorithms=[ALGORITHM])
-        return db.session.get(User, payload["sub"])
+        user = db.session.get(User, payload["sub"])
+        if user is None or user.is_deleted:
+            return None
+        return user
     except jwt.PyJWTError:
         return None
 

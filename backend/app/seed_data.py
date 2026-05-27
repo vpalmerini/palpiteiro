@@ -34,7 +34,7 @@ def _parse_starts_at(value: str) -> datetime:
 
 
 def seed_database() -> str:  # noqa: C901
-    if Tournament.query.first() is not None:
+    if Tournament.active().first() is not None:
         return "already_seeded"
 
     # ── Tournament ──────────────────────────────────────────────────────────────
