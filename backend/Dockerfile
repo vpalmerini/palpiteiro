@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 5001
 
-CMD ["sh", "-c", "gunicorn 'run:app' --bind 0.0.0.0:${PORT:-5001}"]
+CMD ["sh", "-c", "flask --app run db upgrade && gunicorn 'run:app' --bind 0.0.0.0:${PORT:-5001}"]

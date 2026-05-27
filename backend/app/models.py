@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from uuid import uuid4
 
+from sqlalchemy import Index
+
 from .extensions import db
-from .model_mixins import TimestampSoftDeleteMixin, active_unique_index, utc_now
+from .model_mixins import ACTIVE_ONLY, TimestampSoftDeleteMixin, active_unique_index, utc_now
 
 UUID = db.String(36)
 
@@ -88,6 +90,10 @@ class Team(TimestampSoftDeleteMixin, db.Model):
     team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
     flag_code = db.Column(db.String(2), nullable=True)
     logo_url = db.Column(db.String(500), nullable=True)
+
+    __table_args__ = (
+        Index("ix_teams_name_active", "name", postgresql_where=ACTIVE_ONLY, sqlite_where=ACTIVE_ONLY),
+    )
 
 
 class TournamentGroup(TimestampSoftDeleteMixin, db.Model):

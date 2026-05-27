@@ -19,6 +19,13 @@ def _database_url() -> str:
 class Config:
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Reuse connections across requests; avoids repeated TLS/handshake to Supabase.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_size": 5,
+        "max_overflow": 10,
+    }
     JSON_SORT_KEYS = False
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")

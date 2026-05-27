@@ -30,7 +30,7 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      sh -c "flask --app run init-db &&
+      sh -c "flask --app run db upgrade &&
              flask --app run seed-db &&
              flask --app run run --host=0.0.0.0 --port=5001"
 

@@ -5,6 +5,7 @@ from secrets import token_urlsafe
 
 from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy import func
+from sqlalchemy.orm import load_only
 
 from .auth import (
     COOKIE_NAME,
@@ -40,6 +41,7 @@ from .models import (
 )
 from .scoring import calculate_prediction_score
 from .seed_data import seed_database
+from .team_list_cache import get_cached_team_list, invalidate_team_list_cache, set_cached_team_list
 from .soft_delete import (
     replace_snapshot_entries,
     soft_delete_group,
@@ -833,6 +835,31 @@ def _team_full_payload(team: Team):
     }
 
 
+def _list_active_teams_payload() -> list[dict]:
+    cached = get_cached_team_list()
+    if cached is not None:
+        return cached
+
+    teams = (
+        Team.active()
+        .options(
+            load_only(
+                Team.id,
+                Team.name,
+                Team.short_name,
+                Team.team_type,
+                Team.flag_code,
+                Team.logo_url,
+            )
+        )
+        .order_by(Team.name)
+        .all()
+    )
+    payload = [_team_full_payload(t) for t in teams]
+    set_cached_team_list(payload)
+    return payload
+
+
 def _group_payload(group: TournamentGroup):
     return {"id": group.id, "name": group.name, "stageId": group.stage_id}
 
@@ -980,8 +1007,7 @@ def delete_round(round_id):
 
 @api.get("/admin/teams")
 def list_teams():
-    teams = Team.active().order_by(Team.name).all()
-    return jsonify([_team_full_payload(t) for t in teams])
+    return jsonify(_list_active_teams_payload())
 
 
 @api.post("/admin/teams")
@@ -1003,6 +1029,7 @@ def create_team():
                 flag_code=flag_code, logo_url=logo_url)
     db.session.add(team)
     db.session.commit()
+    invalidate_team_list_cache()
     return jsonify(_team_full_payload(team)), 201
 
 
@@ -1025,6 +1052,7 @@ def update_team(team_id):
     if "logoUrl" in data:
         team.logo_url = (data["logoUrl"] or "").strip() or None
     db.session.commit()
+    invalidate_team_list_cache()
     return jsonify(_team_full_payload(team))
 
 
@@ -1264,8 +1292,7 @@ def list_tournaments_public():
 
 @api.get("/teams")
 def list_teams_public():
-    teams = Team.active().order_by(Team.name).all()
-    return jsonify([_team_full_payload(t) for t in teams])
+    return jsonify(_list_active_teams_payload())
 
 
 @api.get("/tournaments/<uuid:tournament_id>/teams")
