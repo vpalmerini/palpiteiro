@@ -9,6 +9,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Palpiteiro",
   description: "Crie bolões, faça seus palpites e dispute o ranking com amigos.",
+  applicationName: "Palpiteiro",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
