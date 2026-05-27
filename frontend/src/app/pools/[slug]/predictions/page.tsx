@@ -21,7 +21,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Us
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import { getAwardPrediction, getMatches, getPool, getPredictions, listTournamentTeams, ordinalRound, saveAwardPrediction, savePrediction } from "@/lib/api";
+import { getPredictionSetup, ordinalRound, saveAwardPrediction, savePrediction } from "@/lib/api";
 import { PredictionsPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
@@ -68,21 +68,15 @@ export default function PredictionsPage({ params }: PageProps) {
 
   useEffect(() => {
     if (!slug || !user) return;
-    void Promise.all([
-      getPool(slug),
-      getMatches(slug),
-      getPredictions(slug),
-      getAwardPrediction(slug),
-    ]).then(async ([poolData, matchData, predictionData, awardData]) => {
-      const teamData = await listTournamentTeams(poolData.tournamentId);
-      setPool(poolData);
-      setMatches(matchData);
-      setTeams(teamData);
-      setAwardLocked(poolData.awardsLocked);
-      setPredictions(Object.fromEntries(predictionData.map((prediction) => [prediction.matchId, prediction])));
+    void getPredictionSetup(slug).then((data) => {
+      setPool(data.pool);
+      setMatches(data.matches);
+      setTeams(data.teams);
+      setAwardLocked(data.awardPrediction.isLocked);
+      setPredictions(Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction])));
       setScoreDrafts(
         Object.fromEntries(
-          predictionData.map((prediction) => [
+          data.predictions.map((prediction) => [
             prediction.matchId,
             {
               homeScore: String(prediction.homeScore),
@@ -92,8 +86,8 @@ export default function PredictionsPage({ params }: PageProps) {
           ]),
         ),
       );
-      if (awardData?.prediction) {
-        const p = awardData.prediction;
+      if (data.awardPrediction.prediction) {
+        const p = data.awardPrediction.prediction;
         setSavedAwardPrediction(p);
         setAwardDraft({
           championTeamId: p.championTeamId ? String(p.championTeamId) : "",

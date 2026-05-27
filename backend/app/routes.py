@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from secrets import token_urlsafe
 
@@ -42,6 +43,11 @@ from .models import (
 from .scoring import calculate_prediction_score
 from .seed_data import seed_database
 from .team_list_cache import get_cached_team_list, invalidate_team_list_cache, set_cached_team_list
+from .tournament_teams_cache import (
+    get_cached_tournament_teams,
+    invalidate_tournament_teams_cache,
+    set_cached_tournament_teams,
+)
 from .soft_delete import (
     replace_snapshot_entries,
     soft_delete_group,
@@ -52,6 +58,10 @@ from .soft_delete import (
 )
 
 api = Blueprint("api", __name__, url_prefix="/api")
+
+_AWARDS_LOCK_CACHE_TTL_SECONDS = 30
+_awards_lock_cache: dict[str, tuple[float, bool]] = {}
+_first_match_cache: dict[str, tuple[float, datetime | None]] = {}
 
 
 def _json():
@@ -72,29 +82,61 @@ def _as_aware_utc(value: datetime) -> datetime:
 
 
 def _awards_locked(pool: Pool) -> bool:
-    """Lock award predictions once the tournament has started or finished.
-
-    Uses Tournament.starts_at when available; falls back to the first match's
-    start time so existing data without starts_at keeps working.
-    """
+    """Lock award predictions once the tournament has started or finished."""
     tournament = pool.tournament
     if tournament.status == TournamentStatus.FINISHED.value:
         return True
+
+    now = datetime.now(timezone.utc)
     if tournament.starts_at is not None:
-        return datetime.now(timezone.utc) >= _as_aware_utc(tournament.starts_at)
-    # Fallback: derive from first scheduled match
+        return now >= _as_aware_utc(tournament.starts_at)
+
+    cached_lock = _awards_lock_cache.get(tournament.id)
+    if cached_lock is not None:
+        expires_at, locked = cached_lock
+        if time.monotonic() < expires_at:
+            return locked
+
+    first_starts_at = _first_match_starts_at(tournament.id)
+    if first_starts_at is None:
+        locked = False
+    else:
+        locked = now >= _as_aware_utc(first_starts_at)
+
+    _awards_lock_cache[tournament.id] = (time.monotonic() + _AWARDS_LOCK_CACHE_TTL_SECONDS, locked)
+    return locked
+
+
+def _first_match_starts_at(tournament_id: str) -> datetime | None:
+    cached = _first_match_cache.get(tournament_id)
+    if cached is not None:
+        expires_at, starts_at = cached
+        if time.monotonic() < expires_at:
+            return starts_at
+
     first_match = (
-        Match.active().filter_by(tournament_id=pool.tournament_id)
+        Match.active()
+        .filter_by(tournament_id=tournament_id)
         .order_by(Match.starts_at.asc())
+        .with_entities(Match.starts_at)
         .first()
     )
-    if first_match is None:
-        return False
-    return datetime.now(timezone.utc) >= _as_aware_utc(first_match.starts_at)
+    starts_at = first_match[0] if first_match else None
+    _first_match_cache[tournament_id] = (time.monotonic() + _AWARDS_LOCK_CACHE_TTL_SECONDS, starts_at)
+    return starts_at
 
 
 def _pool_or_404(slug: str) -> Pool:
-    return Pool.active().filter_by(slug=slug).first_or_404()
+    return (
+        Pool.active()
+        .filter_by(slug=slug)
+        .options(
+            joinedload(Pool.tournament),
+            joinedload(Pool.creator),
+            selectinload(Pool.prizes),
+        )
+        .first_or_404()
+    )
 
 
 def _user_payload(user: User) -> dict:
@@ -163,7 +205,7 @@ def _match_payload(match: Match, team_group_map: dict | None = None):
 
 def _pool_payload(pool: Pool):
     prizes = sorted(
-        PoolPrize.active().filter_by(pool_id=pool.id).all(),
+        (prize for prize in pool.prizes if prize.deleted_at is None),
         key=lambda prize: prize.position,
     )
     current_user = g.get("current_user") or get_current_user()
@@ -467,6 +509,10 @@ def join_pool(slug):
 @api.get("/pools/<slug>/matches")
 def list_matches(slug):
     pool = _pool_or_404(slug)
+    return jsonify(_list_pool_matches_payload(pool))
+
+
+def _list_pool_matches_payload(pool: Pool) -> list[dict]:
     matches = (
         Match.active()
         .filter_by(tournament_id=pool.tournament_id)
@@ -481,22 +527,18 @@ def list_matches(slug):
         .all()
     )
     tgm = _build_team_group_map(pool.tournament_id)
-    return jsonify([_match_payload(m, tgm) for m in matches])
+    return [_match_payload(m, tgm) for m in matches]
 
 
-@api.get("/pools/<slug>/predictions")
-@require_auth
-def list_predictions(slug):
-    pool = _pool_or_404(slug)
-    user: User = g.current_user
+def _list_user_predictions_payload(pool: Pool, user_id: str) -> list[dict]:
     predictions = (
         Prediction.active()
-        .filter_by(pool_id=pool.id, user_id=user.id)
+        .filter_by(pool_id=pool.id, user_id=user_id)
         .options(joinedload(Prediction.user))
         .all()
     )
     if not predictions:
-        return jsonify([])
+        return []
 
     scores_by_prediction = {
         entry.prediction_id: entry
@@ -504,7 +546,38 @@ def list_predictions(slug):
             ScoreEntry.prediction_id.in_([p.id for p in predictions])
         ).all()
     }
-    return jsonify([_prediction_payload(p, scores_by_prediction.get(p.id)) for p in predictions])
+    return [_prediction_payload(p, scores_by_prediction.get(p.id)) for p in predictions]
+
+
+def _award_prediction_response(pool: Pool, user_id: str) -> dict:
+    award_pred = AwardPrediction.active().filter_by(pool_id=pool.id, user_id=user_id).first()
+    return {
+        "isLocked": _awards_locked(pool),
+        "prediction": _award_prediction_payload(award_pred) if award_pred else None,
+    }
+
+
+@api.get("/pools/<slug>/prediction-setup")
+@require_auth
+def get_prediction_setup(slug):
+    """Single round-trip bootstrap for the predictions page."""
+    pool = _pool_or_404(slug)
+    user: User = g.current_user
+    return jsonify({
+        "pool": _pool_payload(pool),
+        "matches": _list_pool_matches_payload(pool),
+        "predictions": _list_user_predictions_payload(pool, user.id),
+        "awardPrediction": _award_prediction_response(pool, user.id),
+        "teams": _list_tournament_teams_payload(pool.tournament_id),
+    })
+
+
+@api.get("/pools/<slug>/predictions")
+@require_auth
+def list_predictions(slug):
+    pool = _pool_or_404(slug)
+    user: User = g.current_user
+    return jsonify(_list_user_predictions_payload(pool, user.id))
 
 
 @api.post("/pools/<slug>/predictions")
@@ -931,9 +1004,28 @@ def _build_team_group_map(tournament_id: str) -> dict:
         TournamentTeam.active()
         .filter_by(tournament_id=tournament_id)
         .filter(TournamentTeam.group_id.isnot(None))
+        .options(joinedload(TournamentTeam.group))
         .all()
     )
     return {e.team_id: e.group for e in entries}
+
+
+def _list_tournament_teams_payload(tournament_id: str) -> list[dict]:
+    cached = get_cached_tournament_teams(tournament_id)
+    if cached is not None:
+        return cached
+
+    entries = (
+        TournamentTeam.active()
+        .filter_by(tournament_id=tournament_id)
+        .join(Team, TournamentTeam.team_id == Team.id)
+        .options(contains_eager(TournamentTeam.team))
+        .order_by(Team.name)
+        .all()
+    )
+    payload = [_team_full_payload(entry.team) for entry in entries]
+    set_cached_tournament_teams(tournament_id, payload)
+    return payload
 
 
 @api.get("/admin/tournaments")
@@ -1149,6 +1241,7 @@ def add_tournament_team(tournament_id):
     entry = TournamentTeam(tournament_id=tid, team_id=team_id)
     db.session.add(entry)
     db.session.commit()
+    invalidate_tournament_teams_cache(tid)
     return jsonify({"tournamentId": tid, "teamId": team_id}), 201
 
 
@@ -1161,6 +1254,7 @@ def remove_tournament_team(tournament_id, team_id):
     ).first_or_404()
     soft_delete_tournament_team(entry)
     db.session.commit()
+    invalidate_tournament_teams_cache(_route_id(tournament_id))
     return "", 204
 
 
@@ -1360,13 +1454,7 @@ def list_teams_public():
 def list_tournament_teams_public(tournament_id):
     tid = _route_id(tournament_id)
     Tournament.active_or_404(tid)
-    entries = (
-        TournamentTeam.active().filter_by(tournament_id=tid)
-        .join(Team)
-        .order_by(Team.name)
-        .all()
-    )
-    return jsonify([_team_full_payload(e.team) for e in entries])
+    return jsonify(_list_tournament_teams_payload(tid))
 
 
 @api.get("/pools/<slug>/award-prediction")
@@ -1374,11 +1462,7 @@ def list_tournament_teams_public(tournament_id):
 def get_award_prediction(slug):
     pool = _pool_or_404(slug)
     user: User = g.current_user
-    award_pred = AwardPrediction.active().filter_by(pool_id=pool.id, user_id=user.id).first()
-    return jsonify({
-        "isLocked": _awards_locked(pool),
-        "prediction": _award_prediction_payload(award_pred) if award_pred else None,
-    })
+    return jsonify(_award_prediction_response(pool, user.id))
 
 
 @api.post("/pools/<slug>/award-prediction")

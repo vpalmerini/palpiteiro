@@ -1,6 +1,6 @@
 import type {
-  AdminPool,
   AwardPrediction,
+  AdminPool,
   EntityId,
   Match,
   MyPoolsByTournament,
@@ -99,6 +99,18 @@ export function createPool(payload: {
 
 export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
+}
+
+export type PredictionSetup = {
+  pool: Pool;
+  matches: Match[];
+  predictions: Prediction[];
+  awardPrediction: { isLocked: boolean; prediction: AwardPrediction | null };
+  teams: Team[];
+};
+
+export function getPredictionSetup(slug: string) {
+  return request<PredictionSetup>(`/pools/${slug}/prediction-setup`);
 }
 
 export function joinPool(slug: string, payload: { nickname?: string }) {
