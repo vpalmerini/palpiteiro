@@ -139,6 +139,14 @@ def _pool_or_404(slug: str) -> Pool:
     )
 
 
+def _pool_for_write_or_404(slug: str, *, load_tournament: bool = False) -> Pool:
+    """Lightweight pool lookup for mutation endpoints."""
+    query = Pool.active().filter_by(slug=slug)
+    if load_tournament:
+        query = query.options(joinedload(Pool.tournament))
+    return query.first_or_404()
+
+
 def _user_payload(user: User) -> dict:
     return {
         "id": user.id,
@@ -245,13 +253,22 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
     }
 
 
-def _prediction_payload(prediction: Prediction, score: ScoreEntry | None = None):
-    if score is None:
+def _prediction_payload(
+    prediction: Prediction,
+    score: ScoreEntry | None = None,
+    *,
+    user_id: str | None = None,
+    include_score: bool = True,
+):
+    if include_score and score is None:
         score = ScoreEntry.active().filter_by(prediction_id=prediction.id).first()
+    resolved_user_id = user_id
+    if resolved_user_id is None:
+        resolved_user_id = prediction.user.id
     return {
         "id": prediction.id,
         "matchId": prediction.match_id,
-        "userId": prediction.user.id,
+        "userId": resolved_user_id,
         "homeScore": prediction.predicted_home_score,
         "awayScore": prediction.predicted_away_score,
         "predictsPenalties": prediction.predicts_penalties,
@@ -638,10 +655,15 @@ def list_predictions(slug):
 @api.post("/pools/<slug>/predictions")
 @require_auth
 def upsert_prediction(slug):
-    pool = _pool_or_404(slug)
+    pool = _pool_for_write_or_404(slug)
     user: User = g.current_user
     data = _json()
-    match = Match.active().filter_by(id=str(data.get("matchId")), tournament_id=pool.tournament_id).first_or_404()
+    match = (
+        Match.active()
+        .filter_by(id=str(data.get("matchId")), tournament_id=pool.tournament_id)
+        .options(joinedload(Match.round).joinedload(Round.stage))
+        .first_or_404()
+    )
 
     if datetime.now(timezone.utc) >= _as_aware_utc(match.starts_at):
         abort(409, description="predictions are locked for this match")
@@ -668,7 +690,7 @@ def upsert_prediction(slug):
     prediction.predicted_penalty_winner_team_id = penalty_winner_team_id if predicts_penalties else None
 
     db.session.commit()
-    return jsonify(_prediction_payload(prediction))
+    return jsonify(_prediction_payload(prediction, user_id=user.id, include_score=False))
 
 
 @api.get("/me/pools")
@@ -1511,7 +1533,7 @@ def get_award_prediction(slug):
 @api.post("/pools/<slug>/award-prediction")
 @require_auth
 def upsert_award_prediction(slug):
-    pool = _pool_or_404(slug)
+    pool = _pool_for_write_or_404(slug, load_tournament=True)
     user: User = g.current_user
     data = _json()
     membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()

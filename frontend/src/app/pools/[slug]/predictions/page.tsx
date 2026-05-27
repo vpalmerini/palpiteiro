@@ -115,6 +115,21 @@ export default function PredictionsPage({ params }: PageProps) {
   async function onAwardSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
+
+    const previous = savedAwardPrediction;
+    const optimistic: AwardPrediction = {
+      id: previous?.id ?? "pending",
+      championTeamId: awardDraft.championTeamId || null,
+      runnerUpTeamId: awardDraft.runnerUpTeamId || null,
+      thirdPlaceTeamId: awardDraft.thirdPlaceTeamId || null,
+      topScorer: awardDraft.topScorer || null,
+      bestPlayer: awardDraft.bestPlayer || null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSavedAwardPrediction(optimistic);
+    setAwardMessage("Salvando palpites especiais…");
+
     try {
       const saved = await saveAwardPrediction(slug, {
         championTeamId: awardDraft.championTeamId || null,
@@ -126,6 +141,7 @@ export default function PredictionsPage({ params }: PageProps) {
       setSavedAwardPrediction(saved);
       setAwardMessage("Palpites especiais salvos.");
     } catch (err) {
+      setSavedAwardPrediction(previous);
       setAwardMessage(err instanceof Error ? err.message : "Erro ao salvar.");
     }
   }
@@ -135,25 +151,55 @@ export default function PredictionsPage({ params }: PageProps) {
     if (!user) return;
 
     const form = new FormData(event.currentTarget);
-    const penaltyWinnerTeamId = form.get("penaltyWinnerTeamId");
-    const saved = await savePrediction(slug, {
-      matchId: match.id,
-      homeScore: Number(form.get("homeScore")),
-      awayScore: Number(form.get("awayScore")),
-      penaltyWinnerTeamId:
-        typeof penaltyWinnerTeamId === "string" && penaltyWinnerTeamId ? penaltyWinnerTeamId : null,
-    });
+    const penaltyWinnerTeamId =
+      typeof form.get("penaltyWinnerTeamId") === "string" && form.get("penaltyWinnerTeamId")
+        ? String(form.get("penaltyWinnerTeamId"))
+        : null;
+    const homeScore = Number(form.get("homeScore"));
+    const awayScore = Number(form.get("awayScore"));
+    const previous = predictions[match.id];
 
-    setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
+    const optimistic: Prediction = {
+      id: previous?.id ?? match.id,
+      matchId: match.id,
+      userId: user.id,
+      homeScore,
+      awayScore,
+      predictsPenalties: match.stage.isKnockout && homeScore === awayScore,
+      penaltyWinnerTeamId,
+      updatedAt: new Date().toISOString(),
+      score: previous?.score ?? null,
+    };
+
+    setPredictions((current) => ({ ...current, [match.id]: optimistic }));
     setScoreDrafts((current) => ({
       ...current,
-      [saved.matchId]: {
-        homeScore: String(saved.homeScore),
-        awayScore: String(saved.awayScore),
-        penaltyWinnerId: saved.penaltyWinnerTeamId ? String(saved.penaltyWinnerTeamId) : "",
+      [match.id]: {
+        homeScore: String(homeScore),
+        awayScore: String(awayScore),
+        penaltyWinnerId: penaltyWinnerTeamId ?? "",
       },
     }));
-    setMessage("Palpite salvo.");
+    setMessage("Salvando palpite…");
+
+    try {
+      const saved = await savePrediction(slug, {
+        matchId: match.id,
+        homeScore,
+        awayScore,
+        penaltyWinnerTeamId,
+      });
+      setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
+      setMessage("Palpite salvo.");
+    } catch (err) {
+      setPredictions((current) => {
+        const next = { ...current };
+        if (previous) next[match.id] = previous;
+        else delete next[match.id];
+        return next;
+      });
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar palpite.");
+    }
   }
 
   if (authLoading || !user || !pool) {
