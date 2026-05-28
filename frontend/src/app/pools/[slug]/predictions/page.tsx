@@ -19,12 +19,14 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { getPredictionSetup, ordinalRound, saveAwardPrediction, savePrediction } from "@/lib/api";
+import { saveAwardPrediction, savePrediction, ordinalRound } from "@/lib/api";
+import { patchPredictionInSetupCache, poolKeys, usePredictionSetup } from "@/lib/pool-queries";
 import { PredictionsPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
-import type { AwardPrediction, Match, Pool, Prediction, Team } from "@/types";
+import type { AwardPrediction, Match, Prediction, Team } from "@/types";
 import { useAuth } from "@/contexts/auth";
 import { useRouter } from "next/navigation";
 
@@ -43,10 +45,8 @@ type AwardDraft = {
 export default function PredictionsPage({ params }: PageProps) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [slug, setSlug] = useState("");
-  const [pool, setPool] = useState<Pool | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
   const [savedAwardPrediction, setSavedAwardPrediction] = useState<AwardPrediction | null>(null);
@@ -55,50 +55,53 @@ export default function PredictionsPage({ params }: PageProps) {
   const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  const { data, isPending } = usePredictionSetup(slug, Boolean(user));
+  const pool = data?.pool ?? null;
+  const matches = data?.matches ?? [];
+  const teams = data?.teams ?? [];
+
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
   }, [params]);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace(`/login?next=/pools/${slug || ""}/predictions`);
     }
   }, [authLoading, user, slug, router]);
 
-  useEffect(() => {
-    if (!slug || !user) return;
-    void getPredictionSetup(slug).then((data) => {
-      setPool(data.pool);
-      setMatches(data.matches);
-      setTeams(data.teams);
-      setAwardLocked(data.awardPrediction.isLocked);
-      setPredictions(Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction])));
-      setScoreDrafts(
-        Object.fromEntries(
-          data.predictions.map((prediction) => [
-            prediction.matchId,
-            {
-              homeScore: String(prediction.homeScore),
-              awayScore: String(prediction.awayScore),
-              penaltyWinnerId: prediction.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "",
-            },
-          ]),
-        ),
-      );
-      if (data.awardPrediction.prediction) {
-        const p = data.awardPrediction.prediction;
-        setSavedAwardPrediction(p);
-        setAwardDraft({
-          championTeamId: p.championTeamId ? String(p.championTeamId) : "",
-          runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
-          thirdPlaceTeamId: p.thirdPlaceTeamId ? String(p.thirdPlaceTeamId) : "",
-          topScorer: p.topScorer ?? "",
-          bestPlayer: p.bestPlayer ?? "",
-        });
-      }
-    });
-  }, [slug, user]);
+  useLayoutEffect(() => {
+    if (!data) return;
+
+    setPredictions(Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction])));
+    setScoreDrafts(
+      Object.fromEntries(
+        data.predictions.map((prediction) => [
+          prediction.matchId,
+          {
+            homeScore: String(prediction.homeScore),
+            awayScore: String(prediction.awayScore),
+            penaltyWinnerId: prediction.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "",
+          },
+        ]),
+      ),
+    );
+    setAwardLocked(data.awardPrediction.isLocked);
+
+    if (data.awardPrediction.prediction) {
+      const p = data.awardPrediction.prediction;
+      setSavedAwardPrediction(p);
+      setAwardDraft({
+        championTeamId: p.championTeamId ? String(p.championTeamId) : "",
+        runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
+        thirdPlaceTeamId: p.thirdPlaceTeamId ? String(p.thirdPlaceTeamId) : "",
+        topScorer: p.topScorer ?? "",
+        bestPlayer: p.bestPlayer ?? "",
+      });
+    } else {
+      setSavedAwardPrediction(null);
+    }
+  }, [data]);
 
   function updateDraft(matchId: string, field: "homeScore" | "awayScore" | "penaltyWinnerId", value: string) {
     setScoreDrafts((current) => ({
@@ -137,6 +140,16 @@ export default function PredictionsPage({ params }: PageProps) {
         thirdPlaceTeamId: awardDraft.thirdPlaceTeamId || null,
         topScorer: awardDraft.topScorer,
         bestPlayer: awardDraft.bestPlayer,
+      });
+      queryClient.setQueryData(poolKeys.predictions(slug), (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          awardPrediction: {
+            isLocked: current.awardPrediction.isLocked,
+            prediction: optimistic,
+          },
+        };
       });
       setAwardMessage("Palpites especiais salvos.");
     } catch (err) {
@@ -189,6 +202,7 @@ export default function PredictionsPage({ params }: PageProps) {
         penaltyWinnerTeamId,
       });
       setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
+      patchPredictionInSetupCache(queryClient, slug, saved);
       setMessage("Palpite salvo.");
     } catch (err) {
       setPredictions((current) => {
@@ -201,7 +215,7 @@ export default function PredictionsPage({ params }: PageProps) {
     }
   }
 
-  if (authLoading || !user || !pool) {
+  if (authLoading || !user || ((isPending && !data) || !pool)) {
     return <PredictionsPageSkeleton />;
   }
 

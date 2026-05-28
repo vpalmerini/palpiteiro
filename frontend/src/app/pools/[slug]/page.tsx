@@ -28,11 +28,12 @@ import {
 import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Share2, Trophy, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { getPoolDetail, getRanking, joinPool, ordinalRound } from "@/lib/api";
+import { joinPool, ordinalRound } from "@/lib/api";
+import { poolKeys, usePoolDetail, usePrefetchPredictionSetup } from "@/lib/pool-queries";
 import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
-import type { Match, Pool, RankingEntry, RoundSnapshot } from "@/types";
 import { useAuth } from "@/contexts/auth";
 
 type PageProps = {
@@ -41,29 +42,33 @@ type PageProps = {
 
 export default function PoolPage({ params }: PageProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const prefetchPredictions = usePrefetchPredictionSetup();
   const [slug, setSlug] = useState<string>("");
-  const [pool, setPool] = useState<Pool | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [ranking, setRanking] = useState<RankingEntry[]>([]);
-  const [predictedMatchIds, setPredictedMatchIds] = useState<Set<string>>(new Set());
-  const [snapshots, setSnapshots] = useState<RoundSnapshot[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  const { data, isPending } = usePoolDetail(slug);
+  const pool = data?.pool ?? null;
+  const matches = data?.matches ?? [];
+  const ranking = data?.ranking ?? [];
+  const snapshots = data?.snapshots ?? [];
+  const predictedMatchIds = useMemo(
+    () => new Set(data?.predictedMatchIds ?? []),
+    [data?.predictedMatchIds],
+  );
+
+  const joinMutation = useMutation({
+    mutationFn: (nickname: string) => joinPool(slug, { nickname }),
+    onSuccess: () => {
+      setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
+      void queryClient.invalidateQueries({ queryKey: poolKeys.detail(slug) });
+    },
+  });
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
   }, [params]);
-
-  useEffect(() => {
-    if (!slug) return;
-    void getPoolDetail(slug).then((data) => {
-      setPool(data.pool);
-      setMatches(data.matches);
-      setRanking(data.ranking);
-      setSnapshots(data.snapshots);
-      setPredictedMatchIds(new Set(data.predictedMatchIds));
-    });
-  }, [slug]);
 
   // ── Timeline chart data ────────────────────────────────────────────────────
   const { chartData, participants, stageNames } = useMemo(() => {
@@ -112,13 +117,7 @@ export default function PoolPage({ params }: PageProps) {
     if (!slug) return;
 
     const form = new FormData(event.currentTarget);
-    const result = await joinPool(slug, {
-      nickname: String(form.get("nickname") || ""),
-    });
-    setPool(result.pool);
-    setMessage("Entrada confirmada. Agora você já pode registrar seus palpites.");
-    setPredictedMatchIds(new Set());
-    setRanking(await getRanking(slug));
+    joinMutation.mutate(String(form.get("nickname") || ""));
   }
 
   async function copyPublicLink() {
@@ -128,9 +127,14 @@ export default function PoolPage({ params }: PageProps) {
     setCopyMessage("Link copiado para a área de transferência.");
   }
 
-  if (!pool) {
+  if ((isPending && !data) || !pool) {
     return <PoolDetailPageSkeleton />;
   }
+
+  const prefetchProps = {
+    onMouseEnter: () => prefetchPredictions(slug),
+    onFocus: () => prefetchPredictions(slug),
+  };
 
   return (
     <Stack gap={6}>
@@ -160,7 +164,7 @@ export default function PoolPage({ params }: PageProps) {
                 <Text color="green.600">Sua participação está confirmada.</Text>
                 {message ? <Text color="green.600">{message}</Text> : null}
                 <Button asChild alignSelf="flex-start" color="white" colorPalette="green" rounded="lg">
-                  <Link href={`/pools/${slug}/predictions`}><HStack gap={2}><ClipboardList size={15} /><span>Fazer palpites</span></HStack></Link>
+                  <Link href={`/pools/${slug}/predictions`} {...prefetchProps}><HStack gap={2}><ClipboardList size={15} /><span>Fazer palpites</span></HStack></Link>
                 </Button>
               </>
             ) : !user ? (
@@ -182,7 +186,7 @@ export default function PoolPage({ params }: PageProps) {
                       <Field.HelperText>Opcional. Se não preencher, seu nome do Google será usado.</Field.HelperText>
                     </Field.Root>
                     {message ? <Text color="green.600">{message}</Text> : null}
-                    <Button colorPalette="green" color="white" rounded="lg" type="submit">
+                    <Button colorPalette="green" color="white" rounded="lg" type="submit" loading={joinMutation.isPending}>
                       Participar
                     </Button>
                   </Stack>
@@ -457,7 +461,7 @@ export default function PoolPage({ params }: PageProps) {
             <Card.Title><HStack gap={2}><CalendarDays size={18} />Próximos jogos</HStack></Card.Title>
             {matches.length > 6 && (
               <Button asChild size="xs" variant="ghost" colorPalette="green">
-                <Link href={`/pools/${slug}/predictions`}>Ver todos ({matches.length})</Link>
+                <Link href={`/pools/${slug}/predictions`} {...prefetchProps}>Ver todos ({matches.length})</Link>
               </Button>
             )}
           </HStack>
@@ -499,7 +503,7 @@ export default function PoolPage({ params }: PageProps) {
                       </HStack>
                     </Badge>
                         <Button asChild colorPalette="green" rounded="lg" size="xs" variant="subtle">
-                        <Link href={`/pools/${slug}/predictions`}>
+                        <Link href={`/pools/${slug}/predictions`} {...prefetchProps}>
                           {hasPrediction ? "Mudar palpite" : "Palpitar"}
                         </Link>
                       </Button>
