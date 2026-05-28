@@ -22,7 +22,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useLayoutEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { saveAwardPrediction, savePrediction, ordinalRound } from "@/lib/api";
+import { saveAwardPrediction, savePrediction, ordinalRound, type PredictionSetup } from "@/lib/api";
 import { patchPredictionInSetupCache, poolKeys, usePredictionSetup } from "@/lib/pool-queries";
 import { PredictionsPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
@@ -141,7 +141,7 @@ export default function PredictionsPage({ params }: PageProps) {
         topScorer: awardDraft.topScorer,
         bestPlayer: awardDraft.bestPlayer,
       });
-      queryClient.setQueryData(poolKeys.predictions(slug), (current) => {
+      queryClient.setQueryData<PredictionSetup>(poolKeys.predictions(slug), (current) => {
         if (!current) return current;
         return {
           ...current,
