@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Avatar,
   Badge,
   Box,
   Button,
@@ -326,7 +327,18 @@ export default function PoolPage({ params }: PageProps) {
                 {ranking.map((entry) => (
                   <Table.Row key={entry.userId}>
                     <Table.Cell>{entry.position}</Table.Cell>
-                    <Table.Cell>{entry.displayName}</Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        <Avatar.Root size="sm">
+                          {entry.pictureUrl ? (
+                            <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                          ) : (
+                            <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                          )}
+                        </Avatar.Root>
+                        <Text>{entry.displayName}</Text>
+                      </HStack>
+                    </Table.Cell>
                     <Table.Cell textAlign="center" fontWeight="semibold">{entry.points}</Table.Cell>
                     <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
                     <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
