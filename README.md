@@ -1,192 +1,117 @@
-# Bolao da Copa
+# Palpiteiro
 
-Aplicacao web para validar a experiencia de criacao e participacao em boloes de futebol.
+Aplicação web para criar e participar de bolões de futebol.
 
 ## Stack
 
-- Backend: Python, Flask, SQLAlchemy
-- Frontend: Next.js
-- Banco: PostgreSQL
+- **Backend:** Python, Flask, SQLAlchemy, Alembic
+- **Frontend:** Next.js (TypeScript)
+- **Banco:** PostgreSQL
 
-## Rodando localmente
+## Pré-requisitos
 
-Suba banco, backend e frontend com Docker Compose:
+- [Docker](https://docs.docker.com/get-docker/) e Docker Compose
+- [Node.js](https://nodejs.org/) 18+ (só para rodar frontend sem Docker)
+- Python 3.12+ (só para rodar backend sem Docker)
+
+## Rodando com Docker Compose
+
+A forma mais rápida. Sobe Postgres, backend e frontend de uma vez:
 
 ```bash
 docker compose up -d
 ```
 
-O backend inicializa as tabelas e cria dados de exemplo automaticamente. Depois abra `http://localhost:3000`.
-
-Para acompanhar os logs:
+O backend aplica as migrations e popula dados de exemplo automaticamente. Abra `http://localhost:3000`.
 
 ```bash
+# Acompanhar logs
 docker compose logs -f
-```
 
-Para parar tudo:
-
-```bash
+# Parar tudo
 docker compose down
-```
 
-Para parar e apagar o volume do banco:
-
-```bash
+# Parar e apagar o volume do banco
 docker compose down -v
 ```
 
-Servicos expostos:
+Serviços expostos:
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:5001`
-- Postgres: `localhost:5432`
+| Serviço  | URL                         |
+|----------|-----------------------------|
+| Frontend | http://localhost:3000       |
+| Backend  | http://localhost:5001       |
+| Postgres | localhost:5432              |
 
-### Rodando Sem Docker Compose
+## Rodando sem Docker Compose
 
-Se quiser rodar manualmente, suba apenas o Postgres e execute backend/frontend em terminais separados:
+### Banco de dados
 
 ```bash
 docker compose up -d postgres
 ```
 
-Backend:
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
+cp .env.example .env            # ajuste GOOGLE_CLIENT_ID e JWT_SECRET
 flask --app run db upgrade
-flask --app run seed-db
+flask --app run seed-db         # opcional — popula dados de exemplo
 flask --app run run --port 5001
 ```
 
-Frontend:
+Variáveis de ambiente relevantes (ver `backend/.env.example`):
+
+| Variável | Descrição |
+|----------|-----------|
+| `DATABASE_URL` | URL do Postgres (padrão: `postgresql+psycopg://bolao:bolao@localhost:5432/bolao`) |
+| `FRONTEND_ORIGIN` | Origem permitida no CORS (padrão: `http://localhost:3000`) |
+| `GOOGLE_CLIENT_ID` | Client ID do Google OAuth |
+| `JWT_SECRET` | Segredo para assinar cookies de sessão |
+
+### Frontend
 
 ```bash
 cd frontend
 npm install
+cp .env.local.example .env.local   # ajuste NEXT_PUBLIC_GOOGLE_CLIENT_ID
 npm run dev
 ```
 
+Variáveis de ambiente relevantes (ver `frontend/.env.local.example`):
+
+| Variável | Descrição |
+|----------|-----------|
+| `FLASK_API_URL` | URL do backend usada pelo proxy Next.js (padrão: `http://localhost:5001`) |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client ID do Google OAuth (exposto ao browser) |
+
 ## Migrations (Alembic)
 
-O schema do banco é versionado com [Alembic](https://alembic.sqlalchemy.org/) via Flask-Migrate. Os arquivos ficam em `backend/migrations/versions/`.
-
-### Comandos do dia a dia
+O schema é versionado com [Alembic](https://alembic.sqlalchemy.org/) via Flask-Migrate. Os arquivos ficam em `backend/migrations/versions/`.
 
 ```bash
 cd backend
 
-# Aplicar migrations pendentes (local, Docker, deploy)
+# Aplicar migrations pendentes
 flask --app run db upgrade
 
-# Depois de alterar models.py, gerar nova migration
+# Criar nova migration após alterar models.py
 flask --app run db migrate -m "descricao da mudanca"
 
-# Ver revision atual
+# Ver revisão atual
 flask --app run db current
 
-# Histórico
+# Histórico de revisões
 flask --app run db history
 ```
 
-`flask --app run init-db` continua disponível como alias de `db upgrade`.
-
-### Banco novo (dev)
+### Banco novo
 
 ```bash
 flask --app run db upgrade
 flask --app run seed-db   # opcional
-```
-
-### Supabase / produção com schema já existente
-
-Confirme no SQL Editor que existem tabelas no plural (`teams`, `users`, …):
-
-```sql
-SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1;
-```
-
-Se **já existem**, marque a revision inicial e aplique só o índice:
-
-```bash
-flask --app run stamp-db      # marca d129c90f03ee (não roda SQL)
-flask --app run db upgrade    # aplica f8a1b2c3d4e5 (índice ix_teams_name_active)
-```
-
-### Erro `relation "teams" does not exist` no db upgrade
-
-O banco foi marcado com `stamp` mas **não tem** o schema plural. Reset e recrie:
-
-```bash
-# 1. No Supabase SQL Editor (apaga tudo — só se puder perder os dados):
-# DROP SCHEMA public CASCADE;
-# CREATE SCHEMA public;
-# GRANT ALL ON SCHEMA public TO postgres;
-# GRANT ALL ON SCHEMA public TO public;
-
-# 2. Local, com DATABASE_URL do Supabase:
-flask --app run db stamp base    # limpa alembic_version
-flask --app run db upgrade       # cria schema completo + índice
-```
-
-### Banco local antigo (tabelas no singular: `user`, `team`, …)
-
-Esse schema não é compatível. Recrie o banco ou rode no Supabase:
-
-```sql
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
-```
-
-Depois: `flask --app run db upgrade`.
-
-### Deploy (Railway)
-
-No startup do backend:
-
-```bash
-flask --app run db upgrade && gunicorn 'run:app' --bind 0.0.0.0:$PORT
-```
-
-## Fluxos Implementados
-
-- Criar bolao com nome, descricao, criador e premios para os tres primeiros lugares.
-- Compartilhar link publico do bolao.
-- Entrar no bolao com nome e e-mail opcional, sem autenticacao completa.
-- Registrar palpites por partida antes do horario de inicio.
-- Em mata-mata, palpite empatado assume pênaltis e exige indicar o vencedor.
-- Cadastrar resultados via API administrativa.
-- Calcular ranking automaticamente com criterios de pontuacao do bolao.
-
-## Endpoints Principais
-
-- `POST /api/admin/seed`: cria torneio, times, fases e jogos de exemplo.
-- `POST /api/pools`: cria um bolao.
-- `GET /api/pools/{slug}`: busca detalhes do bolao.
-- `POST /api/pools/{slug}/join`: entra no bolao.
-- `GET /api/pools/{slug}/matches`: lista partidas do torneio.
-- `POST /api/pools/{slug}/predictions`: cria ou atualiza palpite.
-- `GET /api/pools/{slug}/ranking`: calcula e retorna ranking.
-- `POST /api/admin/matches/{id}/result`: cadastra resultado oficial.
-
-Exemplo de cadastro de resultado:
-
-```bash
-curl -X POST http://localhost:5001/api/admin/matches/1/result \
-  -H "Content-Type: application/json" \
-  -d '{"homeScore":2,"awayScore":1}'
-```
-
-Em jogos de mata-mata, um resultado empatado tambem assume decisao por penaltis:
-
-```bash
-curl -X POST http://localhost:5001/api/admin/matches/3/result \
-  -H "Content-Type: application/json" \
-  -d '{"homeScore":1,"awayScore":1,"penaltyWinnerTeamId":5}'
 ```
