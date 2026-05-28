@@ -407,7 +407,7 @@ export default function PredictionsPage({ params }: PageProps) {
           );
         }
 
-        function renderRoundContent(rs: RoundSection) {
+        function renderRoundContent(rs: RoundSection, openFirstGroup = false) {
           // Group matches by group within the round
           type GroupBucket = { groupKey: string; groupName: string | null; matches: Match[] };
           const buckets = new Map<string, GroupBucket>();
@@ -431,9 +431,9 @@ export default function PredictionsPage({ params }: PageProps) {
 
           return (
             <Stack gap={3} pt={2}>
-              {sorted.map((bucket) =>
+              {sorted.map((bucket, groupIndex) =>
                 bucket.groupName ? (
-                  <Collapsible.Root key={bucket.groupKey}>
+                  <Collapsible.Root key={bucket.groupKey} defaultOpen={openFirstGroup && groupIndex === 0}>
                     <Collapsible.Trigger asChild>
                       <HStack
                         gap={2}
@@ -473,8 +473,8 @@ export default function PredictionsPage({ params }: PageProps) {
         }
 
         function renderStageSections(map: Map<string, StageSection>) {
-          return [...map.values()].map((section) => (
-            <Collapsible.Root key={section.stageId}>
+          return [...map.values()].map((section, sectionIndex) => (
+            <Collapsible.Root key={section.stageId} defaultOpen={sectionIndex === 0}>
               <Collapsible.Trigger asChild>
                 <HStack
                   gap={3}
@@ -504,12 +504,13 @@ export default function PredictionsPage({ params }: PageProps) {
               </Collapsible.Trigger>
               <Collapsible.Content>
                 <Stack gap={4} pt={2}>
-                  {section.rounds.map((rs) =>
-                    section.stageType === "knockout" ? (
+                  {section.rounds.map((rs, roundIndex) => {
+                    const openFirstGroup = sectionIndex === 0 && roundIndex === 0;
+                    return section.stageType === "knockout" ? (
                       // Knockout: no round label, groups still collapsible if present
-                      <Box key={rs.roundId}>{renderRoundContent(rs)}</Box>
+                      <Box key={rs.roundId}>{renderRoundContent(rs, openFirstGroup)}</Box>
                     ) : (
-                      <Collapsible.Root key={rs.roundId}>
+                      <Collapsible.Root key={rs.roundId} defaultOpen={openFirstGroup}>
                         <Collapsible.Trigger asChild>
                           <HStack
                             gap={2}
@@ -537,11 +538,11 @@ export default function PredictionsPage({ params }: PageProps) {
                           </HStack>
                         </Collapsible.Trigger>
                         <Collapsible.Content>
-                          {renderRoundContent(rs)}
+                          {renderRoundContent(rs, openFirstGroup)}
                         </Collapsible.Content>
                       </Collapsible.Root>
-                    )
-                  )}
+                    );
+                  })}
                 </Stack>
               </Collapsible.Content>
             </Collapsible.Root>
