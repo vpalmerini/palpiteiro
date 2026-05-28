@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Box, Container } from "@chakra-ui/react";
+import { Analytics } from "@vercel/analytics/next";
 
 import { AppNav } from "@/components/app-nav";
 import { ClientProviders } from "@/components/client-providers";
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </Box>
           </ClientProviders>
         </Provider>
+        <Analytics />
       </body>
     </html>
   );
