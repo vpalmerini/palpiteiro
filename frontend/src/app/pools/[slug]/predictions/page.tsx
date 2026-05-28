@@ -433,7 +433,7 @@ export default function PredictionsPage({ params }: PageProps) {
             <Stack gap={3} pt={2}>
               {sorted.map((bucket) =>
                 bucket.groupName ? (
-                  <Collapsible.Root key={bucket.groupKey} defaultOpen>
+                  <Collapsible.Root key={bucket.groupKey}>
                     <Collapsible.Trigger asChild>
                       <HStack
                         gap={2}
@@ -474,7 +474,7 @@ export default function PredictionsPage({ params }: PageProps) {
 
         function renderStageSections(map: Map<string, StageSection>) {
           return [...map.values()].map((section) => (
-            <Collapsible.Root key={section.stageId} defaultOpen>
+            <Collapsible.Root key={section.stageId}>
               <Collapsible.Trigger asChild>
                 <HStack
                   gap={3}
@@ -509,7 +509,7 @@ export default function PredictionsPage({ params }: PageProps) {
                       // Knockout: no round label, groups still collapsible if present
                       <Box key={rs.roundId}>{renderRoundContent(rs)}</Box>
                     ) : (
-                      <Collapsible.Root key={rs.roundId} defaultOpen>
+                      <Collapsible.Root key={rs.roundId}>
                         <Collapsible.Trigger asChild>
                           <HStack
                             gap={2}
@@ -806,7 +806,7 @@ export default function PredictionsPage({ params }: PageProps) {
         }
 
         return (
-          <Tabs.Root defaultValue="all" variant="enclosed" size="sm">
+          <Tabs.Root defaultValue="pending" variant="enclosed" size="sm">
             <Tabs.List>
               {/* Mobile: icon + count only. Desktop: icon + label + count */}
               <Tabs.Trigger value="all" flex={{ base: 1, sm: "initial" }}>
