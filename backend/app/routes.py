@@ -211,7 +211,7 @@ def _match_payload(match: Match, team_group_map: dict | None = None):
     }
 
 
-def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
+def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed: bool = False):
     prizes = sorted(
         (prize for prize in pool.prizes if prize.deleted_at is None),
         key=lambda prize: prize.position,
@@ -238,6 +238,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
         "tournamentStatus": pool.tournament.status,
         "hasPredictions": has_predictions,
         "isParticipant": is_participant,
+        "isRemoved": is_removed,
         "scoring": {
             "exactScore": pool.exact_score_points,
             "outcome": pool.outcome_points,
@@ -577,6 +578,29 @@ def update_pool(slug):
     return jsonify(_pool_payload(pool))
 
 
+@api.delete("/pools/<slug>/participants/<user_id>")
+@require_auth
+def remove_participant(slug, user_id):
+    pool = _pool_or_404(slug)
+    creator: User = g.current_user
+
+    if pool.creator_user_id != creator.id:
+        abort(403, description="only the pool creator can remove participants")
+
+    if creator.id == user_id:
+        abort(400, description="the creator cannot remove themselves from the pool")
+
+    membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user_id).first()
+    if membership is None:
+        abort(404, description="participant not found in this pool")
+
+    membership.removed_by_creator = True
+    membership.soft_delete()
+    db.session.commit()
+
+    return jsonify(_pool_payload(pool))
+
+
 @api.get("/pools/<slug>")
 def get_pool(slug):
     return jsonify(_pool_payload(_pool_or_404(slug)))
@@ -588,13 +612,20 @@ def get_pool_detail(slug):
     pool = _pool_or_404(slug)
     _ensure_creator_membership(pool)
 
-    current_user = g.get("current_user") or get_current_user()
+    current_user = get_current_user()
     is_participant = False
+    is_removed = False
     predicted_match_ids: list[str] = []
     if current_user:
-        is_participant = PoolParticipant.active().filter_by(
+        # Single query for any membership record (including soft-deleted) to
+        # correctly detect removed participants without relying on two queries.
+        any_membership = PoolParticipant.query.filter_by(
             pool_id=pool.id, user_id=current_user.id
-        ).first() is not None
+        ).first()
+        if any_membership is not None and any_membership.deleted_at is None:
+            is_participant = True
+        elif any_membership is not None:
+            is_removed = bool(any_membership.removed_by_creator)
         if is_participant:
             predicted_match_ids = _predicted_match_ids(pool, current_user.id)
 
@@ -602,7 +633,7 @@ def get_pool_detail(slug):
     db.session.commit()
 
     return jsonify({
-        "pool": _pool_payload(pool, is_participant=is_participant),
+        "pool": _pool_payload(pool, is_participant=is_participant, is_removed=is_removed),
         "matches": _list_pool_matches_payload(pool),
         "ranking": [{k: v for k, v in e.items()} for e in ranking],
         "snapshots": _list_pool_snapshots_payload(pool),
@@ -618,6 +649,12 @@ def join_pool(slug):
     data = _json()
     nickname = (data.get("nickname") or "").strip()
     display_name = nickname or user.name
+
+    banned = PoolParticipant.query.filter_by(
+        pool_id=pool.id, user_id=user.id, removed_by_creator=True
+    ).first()
+    if banned:
+        abort(403, description="you have been removed from this pool by the creator")
 
     membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()
     if membership is None:

@@ -30,6 +30,7 @@ export type Pool = {
   tournamentStatus: TournamentStatus;
   hasPredictions: boolean;
   isParticipant: boolean;
+  isRemoved: boolean;
   awardsLocked: boolean;
   scoring: {
     exactScore: number;

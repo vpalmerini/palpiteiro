@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Avatar,
   Badge,
   Box,
@@ -168,7 +169,20 @@ export default function PoolPage({ params }: PageProps) {
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>
-            {pool.isParticipant ? (
+            {pool.isRemoved ? (
+              <>
+                <Card.Title><HStack gap={2}><Users size={18} />Participação</HStack></Card.Title>
+                <Alert.Root status="error" rounded="lg">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Você foi removido deste bolão</Alert.Title>
+                    <Alert.Description>
+                      O criador removeu sua participação. Não é possível entrar novamente neste bolão.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              </>
+            ) : pool.isParticipant ? (
               <>
                 <Card.Title><HStack gap={2}><CheckCircle2 size={18} color="var(--chakra-colors-green-500)" />Você já está no bolão</HStack></Card.Title>
                 <Text color="green.600">Sua participação está confirmada.</Text>
