@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  AlertDialog,
   Avatar,
   Badge,
   Button,
   Card,
   Checkbox,
+  Dialog,
   Field,
   Heading,
   HStack,
@@ -133,18 +133,18 @@ function ParticipantsSection({
         )}
       </Stack>
 
-      <AlertDialog.Root
+      <Dialog.Root
         open={targetUser !== null}
         onOpenChange={(d) => { if (!d.open) setTargetUser(null); }}
       >
         <Portal>
-          <AlertDialog.Backdrop />
-          <AlertDialog.Positioner>
-            <AlertDialog.Content>
-              <AlertDialog.Header>
-                <AlertDialog.Title>Remover participante</AlertDialog.Title>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>Remover participante</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
                 <Text>
                   Tem certeza que deseja remover{" "}
                   <Text as="span" fontWeight="bold">{targetUser?.displayName}</Text>?
@@ -152,13 +152,13 @@ function ParticipantsSection({
                 <Text mt={2} fontSize="sm" color="fg.muted">
                   Esta ação é permanente e irreversível. O participante não poderá mais entrar neste bolão.
                 </Text>
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <AlertDialog.ActionTrigger asChild>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
                   <Button ref={cancelRef} variant="outline" disabled={removeMutation.isPending}>
                     Cancelar
                   </Button>
-                </AlertDialog.ActionTrigger>
+                </Dialog.ActionTrigger>
                 <Button
                   colorPalette="red"
                   loading={removeMutation.isPending}
@@ -168,11 +168,11 @@ function ParticipantsSection({
                 >
                   Sim, remover
                 </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Content>
-          </AlertDialog.Positioner>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
         </Portal>
-      </AlertDialog.Root>
+      </Dialog.Root>
     </>
   );
 }
