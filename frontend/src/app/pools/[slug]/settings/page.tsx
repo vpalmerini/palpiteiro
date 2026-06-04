@@ -46,12 +46,16 @@ type AwardsState = {
   bestPlayer: AwardConfigPayload;
 };
 
+const SCORING_KEY_ORDER: (keyof ScoringState)[] = ["exactScore", "outcome", "oneTeamGoals", "penaltyBonus"];
+
 const SCORING_LABELS: Record<keyof ScoringState, { label: string; helper: string }> = {
   exactScore:   { label: "Placar exato",         helper: "Acertou o placar certinho" },
   outcome:      { label: "Resultado",             helper: "Acertou vitória, empate ou derrota" },
   oneTeamGoals: { label: "Gols de um time",       helper: "Acertou os gols de pelo menos um dos times" },
   penaltyBonus: { label: "Bônus pênaltis",        helper: "Acertou o vencedor nos pênaltis (mata-mata)" },
 };
+
+const AWARD_KEY_ORDER: (keyof AwardsState)[] = ["champion", "runnerUp", "thirdPlace", "topScorer", "bestPlayer"];
 
 const AWARD_LABELS: Record<keyof AwardsState, string> = {
   champion:   "Campeão",
@@ -168,7 +172,7 @@ function PoolSettingsForm({ pool, slug }: { pool: Pool; slug: string }) {
                 Regras de pontuação não podem ser alteradas pois já existem palpites neste bolão.
               </Text>
             )}
-            {(Object.keys(scoring) as (keyof ScoringState)[]).map((key) => (
+            {SCORING_KEY_ORDER.map((key) => (
               <HStack key={key} gap={4} align="center" opacity={locked ? 0.5 : 1}>
                 <Stack flex="1" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">{SCORING_LABELS[key].label}</Text>
@@ -209,7 +213,7 @@ function PoolSettingsForm({ pool, slug }: { pool: Pool; slug: string }) {
                 Palpites especiais não podem ser alterados pois já existem palpites neste bolão.
               </Text>
             )}
-            {(Object.keys(awards) as (keyof AwardsState)[]).map((key) => (
+            {AWARD_KEY_ORDER.map((key) => (
               <HStack key={key} gap={4} align="center" opacity={locked ? 0.5 : 1}>
                 <Checkbox.Root
                   checked={awards[key].enabled}
