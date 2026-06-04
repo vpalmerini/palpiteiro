@@ -1689,10 +1689,10 @@ function TournamentDetail({
   const [matches, setMatches] = useState<Match[]>([]);
   const [pools, setPools] = useState<AdminPool[]>([]);
   const [tournamentTeams, setTournamentTeams] = useState<TournamentTeamEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedTournamentId, setLoadedTournamentId] = useState<string | null>(null);
+  const loading = loadedTournamentId !== tournament.id;
 
   useEffect(() => {
-    setLoading(true);
     Promise.all([
       adminListStages(tournament.id),
       adminListMatches(tournament.id),
@@ -1703,7 +1703,7 @@ function TournamentDetail({
       setMatches(m);
       setPools(p);
       setTournamentTeams(tt);
-      setLoading(false);
+      setLoadedTournamentId(tournament.id);
     });
   }, [tournament.id]);
 
