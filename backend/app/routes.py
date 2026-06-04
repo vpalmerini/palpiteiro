@@ -223,10 +223,6 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
             is_participant = PoolParticipant.active().filter_by(
                 pool_id=pool.id, user_id=current_user.id
             ).first() is not None
-    has_predictions = (
-        Prediction.active().filter_by(pool_id=pool.id).first() is not None
-        or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
-    )
     return {
         "id": pool.id,
         "slug": pool.slug,
@@ -235,8 +231,6 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
         "creatorName": pool.creator_name,
         "creatorUserId": pool.creator.id if pool.creator else None,
         "tournamentId": pool.tournament_id,
-        "tournamentStatus": pool.tournament.status,
-        "hasPredictions": has_predictions,
         "isParticipant": is_participant,
         "scoring": {
             "exactScore": pool.exact_score_points,
@@ -499,82 +493,6 @@ def create_pool():
 
     db.session.commit()
     return jsonify({"id": pool.id, "slug": pool.slug}), 201
-
-
-@api.patch("/pools/<slug>")
-@require_auth
-def update_pool(slug):
-    pool = _pool_or_404(slug)
-    user: User = g.current_user
-
-    if pool.creator_user_id != user.id:
-        abort(403, description="only the pool creator can edit this pool")
-
-    if pool.tournament.status == "finished":
-        abort(409, description="cannot edit a pool for a finished tournament")
-
-    data = _json()
-
-    has_predictions = (
-        Prediction.active().filter_by(pool_id=pool.id).first() is not None
-        or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
-    )
-
-    if ("scoring" in data or "awards" in data) and has_predictions:
-        abort(409, description="cannot change scoring or awards after predictions have been made")
-
-    if "name" in data:
-        name = (data.get("name") or "").strip()
-        if not name:
-            abort(400, description="name cannot be empty")
-        pool.name = name
-
-    if "description" in data:
-        pool.description = (data.get("description") or "").strip() or None
-
-    if "prizes" in data:
-        prizes_input = data.get("prizes") or []
-        for existing_prize in [p for p in pool.prizes if p.deleted_at is None]:
-            prize_data = next(
-                (pd for pd in prizes_input if int(pd.get("position", 0)) == existing_prize.position),
-                None,
-            )
-            if prize_data:
-                description = (prize_data.get("description") or "").strip()
-                if description:
-                    existing_prize.description = description
-
-    if "scoring" in data:
-        scoring = data.get("scoring") or {}
-        if "exactScore" in scoring:
-            pool.exact_score_points = int(scoring["exactScore"])
-        if "outcome" in scoring:
-            pool.outcome_points = int(scoring["outcome"])
-        if "oneTeamGoals" in scoring:
-            pool.one_team_goals_points = int(scoring["oneTeamGoals"])
-        if "penaltyBonus" in scoring:
-            pool.penalty_bonus_points = int(scoring["penaltyBonus"])
-
-    if "awards" in data:
-        awards = data.get("awards") or {}
-
-        def _apply_award(enable_attr: str, points_attr: str, key: str) -> None:
-            if key not in awards:
-                return
-            cfg = awards[key] or {}
-            if "enabled" in cfg:
-                setattr(pool, enable_attr, bool(cfg["enabled"]))
-            if "points" in cfg:
-                setattr(pool, points_attr, int(cfg["points"]))
-
-        _apply_award("predict_champion", "champion_points", "champion")
-        _apply_award("predict_runner_up", "runner_up_points", "runnerUp")
-        _apply_award("predict_third_place", "third_place_points", "thirdPlace")
-        _apply_award("predict_top_scorer", "top_scorer_points", "topScorer")
-        _apply_award("predict_best_player", "best_player_points", "bestPlayer")
-
-    db.session.commit()
-    return jsonify(_pool_payload(pool))
 
 
 @api.get("/pools/<slug>")
