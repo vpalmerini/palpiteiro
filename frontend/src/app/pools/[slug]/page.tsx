@@ -140,7 +140,7 @@ export default function PoolPage({ params }: PageProps) {
 
   if (pool.isRemoved) {
     return (
-      <Box mt={{ base: "-24px", md: "-32px" }}>
+      <Stack gap={4} mt={{ base: "-24px", md: "-32px" }}>
         <Alert.Root status="error">
           <Alert.Indicator />
           <Alert.Content>
@@ -150,7 +150,10 @@ export default function PoolPage({ params }: PageProps) {
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>
-      </Box>
+        <Button asChild variant="outline" rounded="lg" alignSelf="flex-start">
+          <Link href="/pools">Voltar para Meus Bolões</Link>
+        </Button>
+      </Stack>
     );
   }
 
