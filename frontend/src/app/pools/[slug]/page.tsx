@@ -140,15 +140,17 @@ export default function PoolPage({ params }: PageProps) {
 
   if (pool.isRemoved) {
     return (
-      <Alert.Root status="error" rounded="xl">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Você foi removido deste bolão</Alert.Title>
-          <Alert.Description>
-            O criador removeu sua participação. Não é possível interagir com este bolão.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
+      <Box mt={{ base: "-24px", md: "-32px" }}>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Você foi removido deste bolão</Alert.Title>
+            <Alert.Description>
+              O criador removeu sua participação. Não é possível interagir com este bolão.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      </Box>
     );
   }
 
