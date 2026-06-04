@@ -152,7 +152,7 @@ export default function PoolPage({ params }: PageProps) {
             </Alert.Content>
           </Alert.Root>
           <Button asChild variant="outline" rounded="lg" alignSelf="flex-start">
-            <Link href="/pools">Voltar para Meus Bolões</Link>
+            <Link href="/meus-boloes">Voltar para Meus Bolões</Link>
           </Button>
         </Card.Body>
       </Card.Root>
