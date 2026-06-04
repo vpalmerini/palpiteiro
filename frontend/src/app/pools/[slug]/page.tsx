@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Share2, Trophy, UserPlus, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -149,9 +149,18 @@ export default function PoolPage({ params }: PageProps) {
           </Heading>
           <Text color="fg.muted">{pool.description || "Sem descrição."}</Text>
           <Input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
-          <Button alignSelf="flex-start" colorPalette="green" color="white" onClick={copyPublicLink} rounded="lg">
-            <HStack gap={2}><Copy size={15} /><span>Copiar link</span></HStack>
-          </Button>
+          <HStack gap={2} flexWrap="wrap">
+            <Button alignSelf="flex-start" colorPalette="green" color="white" onClick={copyPublicLink} rounded="lg">
+              <HStack gap={2}><Copy size={15} /><span>Copiar link</span></HStack>
+            </Button>
+            {user?.id === pool.creatorUserId && pool.tournamentStatus !== "finished" && (
+              <Button asChild alignSelf="flex-start" variant="outline" rounded="lg">
+                <Link href={`/pools/${slug}/settings`}>
+                  <HStack gap={2}><Settings size={15} /><span>Configurações</span></HStack>
+                </Link>
+              </Button>
+            )}
+          </HStack>
           {copyMessage ? <Text color="green.600">{copyMessage}</Text> : null}
         </Card.Body>
       </Card.Root>
