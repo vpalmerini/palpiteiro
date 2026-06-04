@@ -27,6 +27,8 @@ export type Pool = {
   creatorName: string;
   creatorUserId: EntityId | null;
   tournamentId: EntityId;
+  tournamentStatus: TournamentStatus;
+  hasPredictions: boolean;
   isParticipant: boolean;
   awardsLocked: boolean;
   scoring: {
