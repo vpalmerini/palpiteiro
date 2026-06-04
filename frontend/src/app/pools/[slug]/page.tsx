@@ -108,10 +108,9 @@ export default function PoolPage({ params }: PageProps) {
     "#DD6B20", "#319795", "#D53F8C", "#2B6CB0", "#744210",
   ];
 
-  const [publicUrl, setPublicUrl] = useState("");
-  useEffect(() => {
-    if (slug) setPublicUrl(`${window.location.origin}/pools/${slug}`);
-  }, [slug]);
+  const publicUrl = typeof window !== "undefined" && slug
+    ? `${window.location.origin}/pools/${slug}`
+    : "";
 
   async function onJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
