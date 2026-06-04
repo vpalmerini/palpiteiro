@@ -630,6 +630,22 @@ def get_pool_detail(slug):
             predicted_match_ids = _predicted_match_ids(pool, current_user.id)
 
     ranking = _build_ranking(pool, recalculate=False)
+
+    removed_memberships = (
+        PoolParticipant.query
+        .filter_by(pool_id=pool.id, removed_by_creator=True)
+        .filter(PoolParticipant.deleted_at.isnot(None))
+        .all()
+    )
+    removed_participants = [
+        {
+            "userId": m.user_id,
+            "displayName": m.display_name,
+            "pictureUrl": m.user.picture_url if m.user else None,
+        }
+        for m in removed_memberships
+    ]
+
     db.session.commit()
 
     return jsonify({
@@ -638,6 +654,7 @@ def get_pool_detail(slug):
         "ranking": [{k: v for k, v in e.items()} for e in ranking],
         "snapshots": _list_pool_snapshots_payload(pool),
         "predictedMatchIds": predicted_match_ids,
+        "removedParticipants": removed_participants,
     })
 
 

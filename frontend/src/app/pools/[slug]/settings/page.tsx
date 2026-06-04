@@ -24,7 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { removeParticipant, updatePool, type AwardConfigPayload } from "@/lib/api";
+import { removeParticipant, updatePool, type AwardConfigPayload, type RemovedParticipant } from "@/lib/api";
 import { poolKeys, usePoolDetail } from "@/lib/pool-queries";
 import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { useAuth } from "@/contexts/auth";
@@ -72,11 +72,13 @@ function ParticipantsSection({
   pool,
   slug,
   ranking,
+  removedParticipants,
   creatorUserId,
 }: {
   pool: Pool;
   slug: string;
   ranking: RankingEntry[];
+  removedParticipants: RemovedParticipant[];
   creatorUserId: string;
 }) {
   const queryClient = useQueryClient();
@@ -98,7 +100,7 @@ function ParticipantsSection({
       <Separator />
       <Stack gap={3}>
         <Heading size="sm">Participantes</Heading>
-        {others.length === 0 ? (
+        {others.length === 0 && removedParticipants.length === 0 ? (
           <Text fontSize="sm" color="fg.muted">Nenhum outro participante ainda.</Text>
         ) : (
           <Stack gap={2}>
@@ -129,6 +131,27 @@ function ParticipantsSection({
                 </Button>
               </HStack>
             ))}
+            {removedParticipants.length > 0 && (
+              <>
+                <Separator />
+                <Text fontSize="xs" fontWeight="medium" color="fg.muted" textTransform="uppercase" letterSpacing="wide">
+                  Removidos
+                </Text>
+                {removedParticipants.map((entry) => (
+                  <HStack key={entry.userId} gap={3} opacity={0.5}>
+                    <Avatar.Root size="sm">
+                      {entry.pictureUrl ? (
+                        <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                      ) : (
+                        <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                      )}
+                    </Avatar.Root>
+                    <Text fontSize="sm" textDecoration="line-through" color="fg.muted">{entry.displayName}</Text>
+                    <Badge colorPalette="red" variant="subtle" size="sm">Removido</Badge>
+                  </HStack>
+                ))}
+              </>
+            )}
           </Stack>
         )}
       </Stack>
@@ -177,7 +200,7 @@ function ParticipantsSection({
   );
 }
 
-function PoolSettingsForm({ pool, slug, ranking }: { pool: Pool; slug: string; ranking: RankingEntry[] }) {
+function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: Pool; slug: string; ranking: RankingEntry[]; removedParticipants: RemovedParticipant[] }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -375,6 +398,7 @@ function PoolSettingsForm({ pool, slug, ranking }: { pool: Pool; slug: string; r
               pool={pool}
               slug={slug}
               ranking={ranking}
+              removedParticipants={removedParticipants}
               creatorUserId={pool.creatorUserId}
             />
           )}
@@ -392,6 +416,7 @@ export default function PoolSettingsPage({ params }: PageProps) {
   const { data, isPending } = usePoolDetail(slug);
   const pool = data?.pool ?? null;
   const ranking = data?.ranking ?? [];
+  const removedParticipants = data?.removedParticipants ?? [];
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -421,5 +446,5 @@ export default function PoolSettingsPage({ params }: PageProps) {
     return null;
   }
 
-  return <PoolSettingsForm pool={pool} slug={slug} ranking={ranking} />;
+  return <PoolSettingsForm pool={pool} slug={slug} ranking={ranking} removedParticipants={removedParticipants} />;
 }

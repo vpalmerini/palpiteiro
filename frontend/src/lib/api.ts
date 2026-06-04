@@ -106,12 +106,19 @@ export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
 }
 
+export type RemovedParticipant = {
+  userId: string;
+  displayName: string;
+  pictureUrl: string | null;
+};
+
 export type PoolDetail = {
   pool: Pool;
   matches: Match[];
   ranking: RankingEntry[];
   snapshots: RoundSnapshot[];
   predictedMatchIds: string[];
+  removedParticipants: RemovedParticipant[];
 };
 
 export function getPoolDetail(slug: string) {
