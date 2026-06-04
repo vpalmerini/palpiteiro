@@ -158,12 +158,6 @@ export function joinPool(slug: string, payload: { nickname?: string }) {
   });
 }
 
-export function removeParticipant(slug: string, userId: string) {
-  return request<Pool>(`/pools/${slug}/participants/${userId}`, {
-    method: "DELETE",
-  });
-}
-
 export function getMatches(slug: string) {
   return request<Match[]>(`/pools/${slug}/matches`);
 }

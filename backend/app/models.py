@@ -319,7 +319,6 @@ class PoolParticipant(TimestampSoftDeleteMixin, db.Model):
         index=True,
     )
     display_name = db.Column(db.String(120), nullable=False)
-    removed_by_creator = db.Column(db.Boolean, nullable=False, default=False)
 
     pool = db.relationship("Pool", backref=db.backref("memberships", passive_deletes=True))
     user = db.relationship("User", backref="memberships")
