@@ -106,12 +106,19 @@ export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
 }
 
+export type RemovedParticipant = {
+  userId: string;
+  displayName: string;
+  pictureUrl: string | null;
+};
+
 export type PoolDetail = {
   pool: Pool;
   matches: Match[];
   ranking: RankingEntry[];
   snapshots: RoundSnapshot[];
   predictedMatchIds: string[];
+  removedParticipants: RemovedParticipant[];
 };
 
 export function getPoolDetail(slug: string) {
@@ -155,6 +162,12 @@ export function joinPool(slug: string, payload: { nickname?: string }) {
   return request<{ displayName: string; pool: Pool }>(`/pools/${slug}/join`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function removeParticipant(slug: string, userId: string) {
+  return request<Pool>(`/pools/${slug}/participants/${userId}`, {
+    method: "DELETE",
   });
 }
 

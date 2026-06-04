@@ -1,31 +1,34 @@
 "use client";
 
 import {
+  Avatar,
   Badge,
   Button,
   Card,
   Checkbox,
+  Dialog,
   Field,
   Heading,
   HStack,
   Input,
+  Portal,
   Separator,
   SimpleGrid,
   Stack,
   Text,
   Textarea,
 } from "@chakra-ui/react";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, UserMinus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { updatePool, type AwardConfigPayload } from "@/lib/api";
+import { removeParticipant, updatePool, type AwardConfigPayload, type RemovedParticipant } from "@/lib/api";
 import { poolKeys, usePoolDetail } from "@/lib/pool-queries";
 import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { useAuth } from "@/contexts/auth";
-import type { Pool } from "@/types";
+import type { Pool, RankingEntry } from "@/types";
 
 type PageProps = {
   params: { slug: string } | Promise<{ slug: string }>;
@@ -65,7 +68,139 @@ const AWARD_LABELS: Record<keyof AwardsState, string> = {
   bestPlayer: "Melhor jogador",
 };
 
-function PoolSettingsForm({ pool, slug }: { pool: Pool; slug: string }) {
+function ParticipantsSection({
+  pool,
+  slug,
+  ranking,
+  removedParticipants,
+  creatorUserId,
+}: {
+  pool: Pool;
+  slug: string;
+  ranking: RankingEntry[];
+  removedParticipants: RemovedParticipant[];
+  creatorUserId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [targetUser, setTargetUser] = useState<RankingEntry | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => removeParticipant(slug, userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: poolKeys.detail(slug) });
+      setTargetUser(null);
+    },
+  });
+
+  const others = ranking.filter((e) => e.userId !== creatorUserId);
+
+  return (
+    <>
+      <Separator />
+      <Stack gap={3}>
+        <Heading size="sm">Participantes</Heading>
+        {others.length === 0 && removedParticipants.length === 0 ? (
+          <Text fontSize="sm" color="fg.muted">Nenhum outro participante ainda.</Text>
+        ) : (
+          <Stack gap={2}>
+            {others.map((entry) => (
+              <HStack key={entry.userId} gap={3} justify="space-between">
+                <HStack gap={3}>
+                  <Avatar.Root size="sm">
+                    {entry.pictureUrl ? (
+                      <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                    ) : (
+                      <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                    )}
+                  </Avatar.Root>
+                  <Stack gap={0}>
+                    <Text fontSize="sm" fontWeight="medium">{entry.displayName}</Text>
+                    <Text fontSize="xs" color="fg.muted">{entry.points} pts · #{entry.position}</Text>
+                  </Stack>
+                </HStack>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorPalette="red"
+                  onClick={() => setTargetUser(entry)}
+                  aria-label={`Remover ${entry.displayName}`}
+                >
+                  <UserMinus size={14} />
+                  Remover
+                </Button>
+              </HStack>
+            ))}
+            {removedParticipants.length > 0 && (
+              <>
+                <Separator />
+                <Text fontSize="xs" fontWeight="medium" color="fg.muted" textTransform="uppercase" letterSpacing="wide">
+                  Removidos
+                </Text>
+                {removedParticipants.map((entry) => (
+                  <HStack key={entry.userId} gap={3} opacity={0.5}>
+                    <Avatar.Root size="sm">
+                      {entry.pictureUrl ? (
+                        <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                      ) : (
+                        <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                      )}
+                    </Avatar.Root>
+                    <Text fontSize="sm" textDecoration="line-through" color="fg.muted">{entry.displayName}</Text>
+                    <Badge colorPalette="red" variant="subtle" size="sm">Removido</Badge>
+                  </HStack>
+                ))}
+              </>
+            )}
+          </Stack>
+        )}
+      </Stack>
+
+      <Dialog.Root
+        open={targetUser !== null}
+        onOpenChange={(d) => { if (!d.open) setTargetUser(null); }}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>Remover participante</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text>
+                  Tem certeza que deseja remover{" "}
+                  <Text as="span" fontWeight="bold">{targetUser?.displayName}</Text>?
+                </Text>
+                <Text mt={2} fontSize="sm" color="fg.muted">
+                  Esta ação é permanente e irreversível. O participante não poderá mais entrar neste bolão.
+                </Text>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button ref={cancelRef} variant="outline" disabled={removeMutation.isPending}>
+                    Cancelar
+                  </Button>
+                </Dialog.ActionTrigger>
+                <Button
+                  colorPalette="red"
+                  loading={removeMutation.isPending}
+                  onClick={() => {
+                    if (targetUser) removeMutation.mutate(targetUser.userId);
+                  }}
+                >
+                  Sim, remover
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    </>
+  );
+}
+
+function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: Pool; slug: string; ranking: RankingEntry[]; removedParticipants: RemovedParticipant[] }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -257,6 +392,16 @@ function PoolSettingsForm({ pool, slug }: { pool: Pool; slug: string }) {
           >
             Salvar alterações
           </Button>
+
+          {pool.creatorUserId && (
+            <ParticipantsSection
+              pool={pool}
+              slug={slug}
+              ranking={ranking}
+              removedParticipants={removedParticipants}
+              creatorUserId={pool.creatorUserId}
+            />
+          )}
         </Stack>
       </Card.Body>
     </Card.Root>
@@ -270,6 +415,8 @@ export default function PoolSettingsPage({ params }: PageProps) {
 
   const { data, isPending } = usePoolDetail(slug);
   const pool = data?.pool ?? null;
+  const ranking = data?.ranking ?? [];
+  const removedParticipants = data?.removedParticipants ?? [];
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -299,5 +446,5 @@ export default function PoolSettingsPage({ params }: PageProps) {
     return null;
   }
 
-  return <PoolSettingsForm pool={pool} slug={slug} />;
+  return <PoolSettingsForm pool={pool} slug={slug} ranking={ranking} removedParticipants={removedParticipants} />;
 }
