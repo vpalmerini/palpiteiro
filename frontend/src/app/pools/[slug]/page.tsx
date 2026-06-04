@@ -138,20 +138,22 @@ export default function PoolPage({ params }: PageProps) {
     onFocus: () => prefetchPredictions(slug),
   };
 
+  if (pool.isRemoved) {
+    return (
+      <Alert.Root status="error" rounded="xl">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Você foi removido deste bolão</Alert.Title>
+          <Alert.Description>
+            O criador removeu sua participação. Não é possível interagir com este bolão.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    );
+  }
+
   return (
     <Stack gap={6}>
-      {pool.isRemoved && (
-        <Alert.Root status="error" rounded="xl">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Você foi removido deste bolão</Alert.Title>
-            <Alert.Description>
-              O criador removeu sua participação. Não é possível interagir com este bolão.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-
       <Card.Root as="section" rounded="2xl" shadow="lg">
         <Card.Body gap={4}>
           <Badge alignSelf="flex-start" colorPalette="green" rounded="full" px={3} py={1}>
@@ -181,7 +183,7 @@ export default function PoolPage({ params }: PageProps) {
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>
-            {pool.isRemoved ? null : pool.isParticipant ? (
+            {pool.isParticipant ? (
               <>
                 <Card.Title><HStack gap={2}><CheckCircle2 size={18} color="var(--chakra-colors-green-500)" />Você já está no bolão</HStack></Card.Title>
                 <Text color="green.600">Sua participação está confirmada.</Text>
