@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Avatar,
   Badge,
   Box,
@@ -26,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Share2, Trophy, UserPlus, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -108,10 +109,9 @@ export default function PoolPage({ params }: PageProps) {
     "#DD6B20", "#319795", "#D53F8C", "#2B6CB0", "#744210",
   ];
 
-  const [publicUrl, setPublicUrl] = useState("");
-  useEffect(() => {
-    if (slug) setPublicUrl(`${window.location.origin}/pools/${slug}`);
-  }, [slug]);
+  const publicUrl = typeof window !== "undefined" && slug
+    ? `${window.location.origin}/pools/${slug}`
+    : "";
 
   async function onJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -137,6 +137,27 @@ export default function PoolPage({ params }: PageProps) {
     onFocus: () => prefetchPredictions(slug),
   };
 
+  if (pool.isRemoved) {
+    return (
+      <Card.Root rounded="2xl" shadow="lg" mt={8}>
+        <Card.Body gap={4}>
+          <Alert.Root status="error" rounded="lg">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Você foi removido deste bolão</Alert.Title>
+              <Alert.Description>
+                O criador removeu sua participação. Não é possível interagir com este bolão.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Button asChild variant="outline" rounded="lg" alignSelf="flex-start">
+            <Link href="/meus-boloes">Voltar para Meus Bolões</Link>
+          </Button>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+
   return (
     <Stack gap={6}>
       <Card.Root as="section" rounded="2xl" shadow="lg">
@@ -149,9 +170,18 @@ export default function PoolPage({ params }: PageProps) {
           </Heading>
           <Text color="fg.muted">{pool.description || "Sem descrição."}</Text>
           <Input readOnly value={publicUrl} onFocus={(event) => event.currentTarget.select()} />
-          <Button alignSelf="flex-start" colorPalette="green" color="white" onClick={copyPublicLink} rounded="lg">
-            <HStack gap={2}><Copy size={15} /><span>Copiar link</span></HStack>
-          </Button>
+          <HStack gap={2} flexWrap="wrap">
+            <Button alignSelf="flex-start" colorPalette="green" color="white" onClick={copyPublicLink} rounded="lg">
+              <HStack gap={2}><Copy size={15} /><span>Copiar link</span></HStack>
+            </Button>
+            {user?.id === pool.creatorUserId && pool.tournamentStatus !== "finished" && (
+              <Button asChild alignSelf="flex-start" variant="outline" rounded="lg">
+                <Link href={`/pools/${slug}/settings`}>
+                  <HStack gap={2}><Settings size={15} /><span>Configurações</span></HStack>
+                </Link>
+              </Button>
+            )}
+          </HStack>
           {copyMessage ? <Text color="green.600">{copyMessage}</Text> : null}
         </Card.Body>
       </Card.Root>
@@ -201,6 +231,7 @@ export default function PoolPage({ params }: PageProps) {
             )}
           </Card.Body>
         </Card.Root>
+
 
         <Card.Root as="section" rounded="2xl">
           <Card.Body gap={4}>

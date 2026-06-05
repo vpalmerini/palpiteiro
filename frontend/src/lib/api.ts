@@ -106,12 +106,19 @@ export function getPool(slug: string) {
   return request<Pool>(`/pools/${slug}`);
 }
 
+export type RemovedParticipant = {
+  userId: string;
+  displayName: string;
+  pictureUrl: string | null;
+};
+
 export type PoolDetail = {
   pool: Pool;
   matches: Match[];
   ranking: RankingEntry[];
   snapshots: RoundSnapshot[];
   predictedMatchIds: string[];
+  removedParticipants: RemovedParticipant[];
 };
 
 export function getPoolDetail(slug: string) {
@@ -130,10 +137,37 @@ export function getPredictionSetup(slug: string) {
   return request<PredictionSetup>(`/pools/${slug}/prediction-setup`);
 }
 
+export type UpdatePoolPayload = {
+  name?: string;
+  description?: string;
+  prizes?: { position: number; description: string }[];
+  scoring?: { exactScore?: number; outcome?: number; oneTeamGoals?: number; penaltyBonus?: number };
+  awards?: {
+    champion?: AwardConfigPayload;
+    runnerUp?: AwardConfigPayload;
+    thirdPlace?: AwardConfigPayload;
+    topScorer?: AwardConfigPayload;
+    bestPlayer?: AwardConfigPayload;
+  };
+};
+
+export function updatePool(slug: string, payload: UpdatePoolPayload) {
+  return request<Pool>(`/pools/${slug}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function joinPool(slug: string, payload: { nickname?: string }) {
   return request<{ displayName: string; pool: Pool }>(`/pools/${slug}/join`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function removeParticipant(slug: string, userId: string) {
+  return request<Pool>(`/pools/${slug}/participants/${userId}`, {
+    method: "DELETE",
   });
 }
 

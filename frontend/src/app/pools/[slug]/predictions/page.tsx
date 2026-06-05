@@ -73,7 +73,9 @@ export default function PredictionsPage({ params }: PageProps) {
   useLayoutEffect(() => {
     if (!data) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPredictions(Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction])));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setScoreDrafts(
       Object.fromEntries(
         data.predictions.map((prediction) => [
@@ -86,11 +88,14 @@ export default function PredictionsPage({ params }: PageProps) {
         ]),
       ),
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAwardLocked(data.awardPrediction.isLocked);
 
     if (data.awardPrediction.prediction) {
       const p = data.awardPrediction.prediction;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSavedAwardPrediction(p);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAwardDraft({
         championTeamId: p.championTeamId ? String(p.championTeamId) : "",
         runnerUpTeamId: p.runnerUpTeamId ? String(p.runnerUpTeamId) : "",
@@ -99,6 +104,7 @@ export default function PredictionsPage({ params }: PageProps) {
         bestPlayer: p.bestPlayer ?? "",
       });
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSavedAwardPrediction(null);
     }
   }, [data]);

@@ -214,7 +214,7 @@ def _match_payload(match: Match, team_group_map: dict | None = None):
     }
 
 
-def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
+def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed: bool = False):
     prizes = sorted(
         (prize for prize in pool.prizes if prize.deleted_at is None),
         key=lambda prize: prize.position,
@@ -226,6 +226,10 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
             is_participant = PoolParticipant.active().filter_by(
                 pool_id=pool.id, user_id=current_user.id
             ).first() is not None
+    has_predictions = (
+        Prediction.active().filter_by(pool_id=pool.id).first() is not None
+        or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
+    )
     participants_count = PoolParticipant.active().filter_by(pool_id=pool.id).count()
     return {
         "id": pool.id,
@@ -235,7 +239,10 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None):
         "creatorName": pool.creator_name,
         "creatorUserId": pool.creator.id if pool.creator else None,
         "tournamentId": pool.tournament_id,
+        "tournamentStatus": pool.tournament.status,
+        "hasPredictions": has_predictions,
         "isParticipant": is_participant,
+        "isRemoved": is_removed,
         "participantsCount": participants_count,
         "scoring": {
             "exactScore": pool.exact_score_points,
@@ -506,6 +513,105 @@ def create_pool():
     return jsonify({"id": pool.id, "slug": pool.slug}), 201
 
 
+@api.patch("/pools/<slug>")
+@require_auth
+def update_pool(slug):
+    pool = _pool_or_404(slug)
+    user: User = g.current_user
+
+    if pool.creator_user_id != user.id:
+        abort(403, description="only the pool creator can edit this pool")
+
+    if pool.tournament.status == "finished":
+        abort(409, description="cannot edit a pool for a finished tournament")
+
+    data = _json()
+
+    has_predictions = (
+        Prediction.active().filter_by(pool_id=pool.id).first() is not None
+        or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
+    )
+
+    if ("scoring" in data or "awards" in data) and has_predictions:
+        abort(409, description="cannot change scoring or awards after predictions have been made")
+
+    if "name" in data:
+        name = (data.get("name") or "").strip()
+        if not name:
+            abort(400, description="name cannot be empty")
+        pool.name = name
+
+    if "description" in data:
+        pool.description = (data.get("description") or "").strip() or None
+
+    if "prizes" in data:
+        prizes_input = data.get("prizes") or []
+        for existing_prize in [p for p in pool.prizes if p.deleted_at is None]:
+            prize_data = next(
+                (pd for pd in prizes_input if int(pd.get("position", 0)) == existing_prize.position),
+                None,
+            )
+            if prize_data:
+                description = (prize_data.get("description") or "").strip()
+                if description:
+                    existing_prize.description = description
+
+    if "scoring" in data:
+        scoring = data.get("scoring") or {}
+        if "exactScore" in scoring:
+            pool.exact_score_points = int(scoring["exactScore"])
+        if "outcome" in scoring:
+            pool.outcome_points = int(scoring["outcome"])
+        if "oneTeamGoals" in scoring:
+            pool.one_team_goals_points = int(scoring["oneTeamGoals"])
+        if "penaltyBonus" in scoring:
+            pool.penalty_bonus_points = int(scoring["penaltyBonus"])
+
+    if "awards" in data:
+        awards = data.get("awards") or {}
+
+        def _apply_award(enable_attr: str, points_attr: str, key: str) -> None:
+            if key not in awards:
+                return
+            cfg = awards[key] or {}
+            if "enabled" in cfg:
+                setattr(pool, enable_attr, bool(cfg["enabled"]))
+            if "points" in cfg:
+                setattr(pool, points_attr, int(cfg["points"]))
+
+        _apply_award("predict_champion", "champion_points", "champion")
+        _apply_award("predict_runner_up", "runner_up_points", "runnerUp")
+        _apply_award("predict_third_place", "third_place_points", "thirdPlace")
+        _apply_award("predict_top_scorer", "top_scorer_points", "topScorer")
+        _apply_award("predict_best_player", "best_player_points", "bestPlayer")
+
+    db.session.commit()
+    return jsonify(_pool_payload(pool))
+
+
+@api.delete("/pools/<slug>/participants/<user_id>")
+@require_auth
+def remove_participant(slug, user_id):
+    pool = _pool_or_404(slug)
+    creator: User = g.current_user
+
+    if pool.creator_user_id != creator.id:
+        abort(403, description="only the pool creator can remove participants")
+
+    if creator.id == user_id:
+        abort(400, description="the creator cannot remove themselves from the pool")
+
+    membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user_id).first()
+    if membership is None:
+        abort(404, description="participant not found in this pool")
+
+    membership.removed_by_creator = True
+    membership.soft_delete()
+    db.session.commit()
+
+    return jsonify(_pool_payload(pool))
+
+
 @api.get("/pools/<slug>")
 def get_pool(slug):
     return jsonify(_pool_payload(_pool_or_404(slug)))
@@ -517,25 +623,49 @@ def get_pool_detail(slug):
     pool = _pool_or_404(slug)
     _ensure_creator_membership(pool)
 
-    current_user = g.get("current_user") or get_current_user()
+    current_user = get_current_user()
     is_participant = False
+    is_removed = False
     predicted_match_ids: list[str] = []
     if current_user:
-        is_participant = PoolParticipant.active().filter_by(
+        # Single query for any membership record (including soft-deleted) to
+        # correctly detect removed participants without relying on two queries.
+        any_membership = PoolParticipant.query.filter_by(
             pool_id=pool.id, user_id=current_user.id
-        ).first() is not None
+        ).first()
+        if any_membership is not None and any_membership.deleted_at is None:
+            is_participant = True
+        elif any_membership is not None:
+            is_removed = bool(any_membership.removed_by_creator)
         if is_participant:
             predicted_match_ids = _predicted_match_ids(pool, current_user.id)
 
     ranking = _build_ranking(pool, recalculate=False)
+
+    removed_memberships = (
+        PoolParticipant.query
+        .filter_by(pool_id=pool.id, removed_by_creator=True)
+        .filter(PoolParticipant.deleted_at.isnot(None))
+        .all()
+    )
+    removed_participants = [
+        {
+            "userId": m.user_id,
+            "displayName": m.display_name,
+            "pictureUrl": m.user.picture_url if m.user else None,
+        }
+        for m in removed_memberships
+    ]
+
     db.session.commit()
 
     return jsonify({
-        "pool": _pool_payload(pool, is_participant=is_participant),
+        "pool": _pool_payload(pool, is_participant=is_participant, is_removed=is_removed),
         "matches": _list_pool_matches_payload(pool),
         "ranking": [{k: v for k, v in e.items()} for e in ranking],
         "snapshots": _list_pool_snapshots_payload(pool),
         "predictedMatchIds": predicted_match_ids,
+        "removedParticipants": removed_participants,
     })
 
 
@@ -547,6 +677,12 @@ def join_pool(slug):
     data = _json()
     nickname = (data.get("nickname") or "").strip()
     display_name = nickname or user.name
+
+    banned = PoolParticipant.query.filter_by(
+        pool_id=pool.id, user_id=user.id, removed_by_creator=True
+    ).first()
+    if banned:
+        abort(403, description="you have been removed from this pool by the creator")
 
     membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()
     if membership is None:
