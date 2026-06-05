@@ -41,6 +41,9 @@ from .models import (
     User,
 )
 from .scoring import calculate_prediction_score
+
+MAX_POOLS_PER_USER_PER_TOURNAMENT = 5
+MAX_PARTICIPANTS_PER_POOL = 30
 from .seed_data import seed_database
 from .team_list_cache import get_cached_team_list, invalidate_team_list_cache, set_cached_team_list
 from .tournament_teams_cache import (
@@ -227,6 +230,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
         Prediction.active().filter_by(pool_id=pool.id).first() is not None
         or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
     )
+    participants_count = PoolParticipant.active().filter_by(pool_id=pool.id).count()
     return {
         "id": pool.id,
         "slug": pool.slug,
@@ -239,6 +243,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
         "hasPredictions": has_predictions,
         "isParticipant": is_participant,
         "isRemoved": is_removed,
+        "participantsCount": participants_count,
         "scoring": {
             "exactScore": pool.exact_score_points,
             "outcome": pool.outcome_points,
@@ -447,6 +452,12 @@ def create_pool():
     tournament = Tournament.active().filter_by(id=str(data["tournamentId"])).first()
     if tournament is None:
         abort(404, description="tournament not found")
+
+    pool_count = Pool.active().filter_by(
+        creator_user_id=user.id, tournament_id=tournament.id
+    ).count()
+    if pool_count >= MAX_POOLS_PER_USER_PER_TOURNAMENT:
+        abort(422, description=f"Você já criou o limite de {MAX_POOLS_PER_USER_PER_TOURNAMENT} bolões para este torneio")
 
     slug = token_urlsafe(12)
 
@@ -675,6 +686,9 @@ def join_pool(slug):
 
     membership = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()
     if membership is None:
+        participant_count = PoolParticipant.active().filter_by(pool_id=pool.id).count()
+        if participant_count >= MAX_PARTICIPANTS_PER_POOL:
+            abort(422, description=f"Este bolão já atingiu o limite de {MAX_PARTICIPANTS_PER_POOL} participantes")
         membership = PoolParticipant(pool_id=pool.id, user_id=user.id, display_name=display_name)
         db.session.add(membership)
     else:

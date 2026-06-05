@@ -27,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -197,6 +197,11 @@ export default function PoolPage({ params }: PageProps) {
                 <Button asChild alignSelf="flex-start" color="white" colorPalette="green" rounded="lg">
                   <Link href={`/pools/${slug}/predictions`} {...prefetchProps}><HStack gap={2}><ClipboardList size={15} /><span>Fazer palpites</span></HStack></Link>
                 </Button>
+              </>
+            ) : pool.participantsCount >= 30 ? (
+              <>
+                <Card.Title><HStack gap={2}><Users size={18} />Bolão lotado</HStack></Card.Title>
+                <Text color="fg.muted">Este bolão já atingiu o limite de 30 participantes.</Text>
               </>
             ) : !user ? (
               <>
