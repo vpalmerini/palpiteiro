@@ -27,6 +27,7 @@ def create_app(config_object=Config):
     @app.errorhandler(403)
     @app.errorhandler(404)
     @app.errorhandler(409)
+    @app.errorhandler(422)
     def handle_error(error):
         return jsonify({"error": error.description}), error.code
 

@@ -28,6 +28,7 @@ export type Pool = {
   creatorUserId: EntityId | null;
   tournamentId: EntityId;
   isParticipant: boolean;
+  participantsCount: number;
   awardsLocked: boolean;
   scoring: {
     exactScore: number;

@@ -168,6 +168,11 @@ export default function PoolPage({ params }: PageProps) {
                   <Link href={`/pools/${slug}/predictions`} {...prefetchProps}><HStack gap={2}><ClipboardList size={15} /><span>Fazer palpites</span></HStack></Link>
                 </Button>
               </>
+            ) : pool.participantsCount >= 30 ? (
+              <>
+                <Card.Title><HStack gap={2}><Users size={18} />Bolão lotado</HStack></Card.Title>
+                <Text color="fg.muted">Este bolão já atingiu o limite de 30 participantes.</Text>
+              </>
             ) : !user ? (
               <>
                 <Card.Title><HStack gap={2}><UserPlus size={18} />Entrar no bolão</HStack></Card.Title>
