@@ -402,7 +402,7 @@ export default function PredictionsPage({ params }: PageProps) {
             rounded="md"
             flexShrink={0}
             variant={effectiveDate === null ? "solid" : "outline"}
-            colorPalette="green"
+            colorPalette="gray"
             onClick={() => setSelectedDate(null)}
           >
             Todos
@@ -418,7 +418,7 @@ export default function PredictionsPage({ params }: PageProps) {
                 rounded="md"
                 flexShrink={0}
                 variant={effectiveDate === date ? "solid" : "outline"}
-                colorPalette="green"
+                colorPalette="gray"
                 onClick={() => setSelectedDate(date)}
               >
                 {weekdayLabel} {day}/{month < 10 ? `0${month}` : month}
