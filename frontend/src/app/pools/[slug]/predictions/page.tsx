@@ -54,7 +54,8 @@ export default function PredictionsPage({ params }: PageProps) {
   const [awardLocked, setAwardLocked] = useState(false);
   const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // undefined = auto (next date with matches), null = "Todos", string = user-selected date
+  const [selectedDate, setSelectedDate] = useState<string | null | undefined>(undefined);
 
   const { data, isPending } = usePredictionSetup(slug, Boolean(user));
   const pool = data?.pool ?? null;
@@ -65,6 +66,11 @@ export default function PredictionsPage({ params }: PageProps) {
     return new Date(m.startsAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   }
 
+  function parsePtBRDate(localeDateStr: string): Date {
+    const [day, month, year] = localeDateStr.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
   const availableDates = useMemo(() => {
     const seen = new Set<string>();
     return matches
@@ -72,10 +78,20 @@ export default function PredictionsPage({ params }: PageProps) {
       .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; });
   }, [matches]);
 
+  // First upcoming date that has matches (today or future)
+  const nextMatchDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return availableDates.find((d) => parsePtBRDate(d) >= today) ?? availableDates[availableDates.length - 1] ?? null;
+  }, [availableDates]);
+
+  // Effective date: auto-resolved when user hasn't made a selection yet
+  const effectiveDate = selectedDate === undefined ? nextMatchDate : selectedDate;
+
   const filteredMatches = useMemo(() => {
-    if (!selectedDate) return matches;
-    return matches.filter((m) => matchLocalDate(m) === selectedDate);
-  }, [matches, selectedDate]);
+    if (!effectiveDate) return matches;
+    return matches.filter((m) => matchLocalDate(m) === effectiveDate);
+  }, [matches, effectiveDate]);
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -385,7 +401,7 @@ export default function PredictionsPage({ params }: PageProps) {
             size="sm"
             rounded="full"
             flexShrink={0}
-            variant={selectedDate === null ? "solid" : "outline"}
+            variant={effectiveDate === null ? "solid" : "outline"}
             colorPalette="green"
             onClick={() => setSelectedDate(null)}
           >
@@ -399,7 +415,7 @@ export default function PredictionsPage({ params }: PageProps) {
                 size="sm"
                 rounded="full"
                 flexShrink={0}
-                variant={selectedDate === date ? "solid" : "outline"}
+                variant={effectiveDate === date ? "solid" : "outline"}
                 colorPalette="green"
                 onClick={() => setSelectedDate(date)}
               >
