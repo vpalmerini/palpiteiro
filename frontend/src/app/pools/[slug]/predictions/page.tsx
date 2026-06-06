@@ -396,10 +396,10 @@ export default function PredictionsPage({ params }: PageProps) {
       ) : null}
 
       {availableDates.length > 1 && (
-        <HStack gap={2} overflowX="auto" pb={1} flexWrap="nowrap">
+        <HStack gap={2} overflowX="auto" pb={3} flexWrap="nowrap">
           <Button
             size="sm"
-            rounded="full"
+            rounded="md"
             flexShrink={0}
             variant={effectiveDate === null ? "solid" : "outline"}
             colorPalette="green"
@@ -408,18 +408,20 @@ export default function PredictionsPage({ params }: PageProps) {
             Todos
           </Button>
           {availableDates.map((date) => {
-            const [day, month] = date.split("/");
+            const [day, month, year] = date.split("/").map(Number);
+            const weekday = new Date(year, month - 1, day).toLocaleDateString("pt-BR", { weekday: "short" });
+            const weekdayLabel = weekday.replace(".", "").replace(/^\w/, (c) => c.toUpperCase());
             return (
               <Button
                 key={date}
                 size="sm"
-                rounded="full"
+                rounded="md"
                 flexShrink={0}
                 variant={effectiveDate === date ? "solid" : "outline"}
                 colorPalette="green"
                 onClick={() => setSelectedDate(date)}
               >
-                {day}/{month}
+                {weekdayLabel} {day}/{month < 10 ? `0${month}` : month}
               </Button>
             );
           })}
