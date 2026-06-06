@@ -403,6 +403,7 @@ export default function PredictionsPage({ params }: PageProps) {
             flexShrink={0}
             variant={effectiveDate === null ? "solid" : "outline"}
             colorPalette="gray"
+            {...(effectiveDate === null && { bg: "gray.600", color: "white" })}
             onClick={() => setSelectedDate(null)}
           >
             Todos
@@ -411,14 +412,16 @@ export default function PredictionsPage({ params }: PageProps) {
             const [day, month, year] = date.split("/").map(Number);
             const weekday = new Date(year, month - 1, day).toLocaleDateString("pt-BR", { weekday: "short" });
             const weekdayLabel = weekday.replace(".", "").replace(/^\w/, (c) => c.toUpperCase());
+            const isActive = effectiveDate === date;
             return (
               <Button
                 key={date}
                 size="sm"
                 rounded="md"
                 flexShrink={0}
-                variant={effectiveDate === date ? "solid" : "outline"}
+                variant={isActive ? "solid" : "outline"}
                 colorPalette="gray"
+                {...(isActive && { bg: "gray.600", color: "white" })}
                 onClick={() => setSelectedDate(date)}
               >
                 {weekdayLabel} {day}/{month < 10 ? `0${month}` : month}
