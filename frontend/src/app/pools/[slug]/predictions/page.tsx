@@ -603,9 +603,9 @@ export default function PredictionsPage({ params }: PageProps) {
           ));
         }
 
-        const pending = matches.filter((m) => !predictions[m.id] && !m.isLocked);
-        const predicted = matches.filter((m) => !!predictions[m.id]);
-        const missed = matches.filter((m) => !predictions[m.id] && m.isLocked);
+        const pending = filteredMatches.filter((m) => !predictions[m.id] && !m.isLocked);
+        const predicted = filteredMatches.filter((m) => !!predictions[m.id]);
+        const missed = filteredMatches.filter((m) => !predictions[m.id] && m.isLocked);
 
         function renderMatchCard(match: Match) {
           const prediction = predictions[match.id];
@@ -869,7 +869,7 @@ export default function PredictionsPage({ params }: PageProps) {
                   <Users size={13} />
                   <Box as="span" display={{ base: "none", sm: "inline" }}>Todos</Box>
                 </HStack>
-                <Badge ml={1} colorPalette="gray" variant="subtle" rounded="full">{matches.length}</Badge>
+                <Badge ml={1} colorPalette="gray" variant="subtle" rounded="full">{filteredMatches.length}</Badge>
               </Tabs.Trigger>
               <Tabs.Trigger value="pending" flex={{ base: 1, sm: "initial" }}>
                 <HStack gap={1}>
