@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useLayoutEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { saveAwardPrediction, savePrediction, ordinalRound, type PredictionSetup } from "@/lib/api";
@@ -54,11 +54,28 @@ export default function PredictionsPage({ params }: PageProps) {
   const [awardLocked, setAwardLocked] = useState(false);
   const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const { data, isPending } = usePredictionSetup(slug, Boolean(user));
   const pool = data?.pool ?? null;
   const matches = data?.matches ?? [];
   const teams = data?.teams ?? [];
+
+  function matchLocalDate(m: { startsAt: string }) {
+    return new Date(m.startsAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  }
+
+  const availableDates = useMemo(() => {
+    const seen = new Set<string>();
+    return matches
+      .map(matchLocalDate)
+      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; });
+  }, [matches]);
+
+  const filteredMatches = useMemo(() => {
+    if (!selectedDate) return matches;
+    return matches.filter((m) => matchLocalDate(m) === selectedDate);
+  }, [matches, selectedDate]);
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -362,6 +379,37 @@ export default function PredictionsPage({ params }: PageProps) {
         </Card.Root>
       ) : null}
 
+      {availableDates.length > 1 && (
+        <HStack gap={2} overflowX="auto" pb={1} flexWrap="nowrap">
+          <Button
+            size="sm"
+            rounded="full"
+            flexShrink={0}
+            variant={selectedDate === null ? "solid" : "outline"}
+            colorPalette="green"
+            onClick={() => setSelectedDate(null)}
+          >
+            Todos
+          </Button>
+          {availableDates.map((date) => {
+            const [day, month] = date.split("/");
+            return (
+              <Button
+                key={date}
+                size="sm"
+                rounded="full"
+                flexShrink={0}
+                variant={selectedDate === date ? "solid" : "outline"}
+                colorPalette="green"
+                onClick={() => setSelectedDate(date)}
+              >
+                {day}/{month}
+              </Button>
+            );
+          })}
+        </HStack>
+      )}
+
       {(() => {
         // Group matches: stage → round (ordered by round.number)
         type RoundSection = { roundId: string; roundNumber: number; matches: Match[] };
@@ -399,7 +447,7 @@ export default function PredictionsPage({ params }: PageProps) {
           return map;
         }
 
-        const stageMap = buildStageMap(matches);
+        const stageMap = buildStageMap(filteredMatches);
 
         function renderMatchGrid(matchList: Match[]) {
           return (
