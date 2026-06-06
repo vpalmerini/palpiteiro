@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useLayoutEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { saveAwardPrediction, savePrediction, ordinalRound, type PredictionSetup } from "@/lib/api";
@@ -54,11 +54,44 @@ export default function PredictionsPage({ params }: PageProps) {
   const [awardLocked, setAwardLocked] = useState(false);
   const [awardMessage, setAwardMessage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // undefined = auto (next date with matches), null = "Todos", string = user-selected date
+  const [selectedDate, setSelectedDate] = useState<string | null | undefined>(undefined);
 
   const { data, isPending } = usePredictionSetup(slug, Boolean(user));
   const pool = data?.pool ?? null;
   const matches = data?.matches ?? [];
   const teams = data?.teams ?? [];
+
+  function matchLocalDate(m: { startsAt: string }) {
+    return new Date(m.startsAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  }
+
+  function parsePtBRDate(localeDateStr: string): Date {
+    const [day, month, year] = localeDateStr.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const availableDates = useMemo(() => {
+    const seen = new Set<string>();
+    return matches
+      .map(matchLocalDate)
+      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; });
+  }, [matches]);
+
+  // First upcoming date that has matches (today or future)
+  const nextMatchDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return availableDates.find((d) => parsePtBRDate(d) >= today) ?? availableDates[availableDates.length - 1] ?? null;
+  }, [availableDates]);
+
+  // Effective date: auto-resolved when user hasn't made a selection yet
+  const effectiveDate = selectedDate === undefined ? nextMatchDate : selectedDate;
+
+  const filteredMatches = useMemo(() => {
+    if (!effectiveDate) return matches;
+    return matches.filter((m) => matchLocalDate(m) === effectiveDate);
+  }, [matches, effectiveDate]);
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -362,6 +395,42 @@ export default function PredictionsPage({ params }: PageProps) {
         </Card.Root>
       ) : null}
 
+      {availableDates.length > 1 && (
+        <HStack gap={2} overflowX="auto" pb={3} flexWrap="nowrap">
+          <Button
+            size="sm"
+            rounded="md"
+            flexShrink={0}
+            variant={effectiveDate === null ? "solid" : "outline"}
+            colorPalette="gray"
+            {...(effectiveDate === null && { bg: "gray.600", color: "white" })}
+            onClick={() => setSelectedDate(null)}
+          >
+            Todos
+          </Button>
+          {availableDates.map((date) => {
+            const [day, month, year] = date.split("/").map(Number);
+            const weekday = new Date(year, month - 1, day).toLocaleDateString("pt-BR", { weekday: "short" });
+            const weekdayLabel = weekday.replace(".", "").replace(/^\w/, (c) => c.toUpperCase());
+            const isActive = effectiveDate === date;
+            return (
+              <Button
+                key={date}
+                size="sm"
+                rounded="md"
+                flexShrink={0}
+                variant={isActive ? "solid" : "outline"}
+                colorPalette="gray"
+                {...(isActive && { bg: "gray.600", color: "white" })}
+                onClick={() => setSelectedDate(date)}
+              >
+                {weekdayLabel} {day}/{month < 10 ? `0${month}` : month}
+              </Button>
+            );
+          })}
+        </HStack>
+      )}
+
       {(() => {
         // Group matches: stage → round (ordered by round.number)
         type RoundSection = { roundId: string; roundNumber: number; matches: Match[] };
@@ -399,7 +468,7 @@ export default function PredictionsPage({ params }: PageProps) {
           return map;
         }
 
-        const stageMap = buildStageMap(matches);
+        const stageMap = buildStageMap(filteredMatches);
 
         function renderMatchGrid(matchList: Match[]) {
           return (
@@ -555,9 +624,9 @@ export default function PredictionsPage({ params }: PageProps) {
           ));
         }
 
-        const pending = matches.filter((m) => !predictions[m.id] && !m.isLocked);
-        const predicted = matches.filter((m) => !!predictions[m.id]);
-        const missed = matches.filter((m) => !predictions[m.id] && m.isLocked);
+        const pending = filteredMatches.filter((m) => !predictions[m.id] && !m.isLocked);
+        const predicted = filteredMatches.filter((m) => !!predictions[m.id]);
+        const missed = filteredMatches.filter((m) => !predictions[m.id] && m.isLocked);
 
         function renderMatchCard(match: Match) {
           const prediction = predictions[match.id];
@@ -821,7 +890,7 @@ export default function PredictionsPage({ params }: PageProps) {
                   <Users size={13} />
                   <Box as="span" display={{ base: "none", sm: "inline" }}>Todos</Box>
                 </HStack>
-                <Badge ml={1} colorPalette="gray" variant="subtle" rounded="full">{matches.length}</Badge>
+                <Badge ml={1} colorPalette="gray" variant="subtle" rounded="full">{filteredMatches.length}</Badge>
               </Tabs.Trigger>
               <Tabs.Trigger value="pending" flex={{ base: 1, sm: "initial" }}>
                 <HStack gap={1}>
