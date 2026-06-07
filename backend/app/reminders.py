@@ -46,6 +46,7 @@ def send_pending_prediction_reminders(now: datetime | None = None) -> int:
     dedup_key = today_brt.isoformat()
 
     pools_with_pending: dict[str, set[str]] = {}  # user_id -> set(pool_id)
+    pending_matches_by_user: dict[str, set[str]] = {}  # user_id -> set(match_id)
     slug_by_user: dict[str, str] = {}  # user_id -> a pool slug (for deep-link)
 
     tournaments = (
@@ -79,8 +80,10 @@ def send_pending_prediction_reminders(now: datetime | None = None) -> int:
                     .with_entities(Prediction.match_id)
                     .all()
                 }
-                if open_ids - predicted:
+                missing = open_ids - predicted
+                if missing:
                     pools_with_pending.setdefault(participant.user_id, set()).add(pool.id)
+                    pending_matches_by_user.setdefault(participant.user_id, set()).update(missing)
                     slug_by_user.setdefault(participant.user_id, pool.slug)
 
     notified = 0
@@ -104,9 +107,11 @@ def send_pending_prediction_reminders(now: datetime | None = None) -> int:
             if len(pool_ids) == 1
             else "/meus-boloes"
         )
+        n = len(pending_matches_by_user.get(user_id, set()))
+        jogo = "jogo" if n == 1 else "jogos"
         payload = {
             "title": "Palpites pendentes",
-            "body": "Você ainda tem palpites pendentes para os jogos de hoje. Não esqueça!",
+            "body": f"Você tem {n} {jogo} sem palpite hoje. Não esqueça!",
             "url": url,
         }
         send_to_user(user_id, payload)
