@@ -26,6 +26,7 @@ from .models import (
     PoolParticipant,
     PoolPrize,
     Prediction,
+    PushSubscription,
     Round,
     RoundSnapshot,
     RoundSnapshotEntry,
@@ -696,6 +697,50 @@ def join_pool(slug):
 
     db.session.commit()
     return jsonify({"displayName": membership.display_name, "pool": _pool_payload(pool)})
+
+
+@api.post("/push/subscribe")
+@require_auth
+def push_subscribe():
+    user: User = g.current_user
+    data = _json()
+    endpoint = (data.get("endpoint") or "").strip()
+    keys = data.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        abort(400, description="endpoint and keys are required")
+
+    existing = PushSubscription.active().filter_by(endpoint=endpoint).first()
+    if existing is None:
+        db.session.add(
+            PushSubscription(user_id=user.id, endpoint=endpoint, p256dh=p256dh, auth=auth)
+        )
+    else:
+        existing.user_id = user.id
+        existing.p256dh = p256dh
+        existing.auth = auth
+
+    db.session.commit()
+    return jsonify({"status": "subscribed"}), 201
+
+
+@api.post("/push/unsubscribe")
+@require_auth
+def push_unsubscribe():
+    user: User = g.current_user
+    data = _json()
+    endpoint = (data.get("endpoint") or "").strip()
+    if not endpoint:
+        abort(400, description="endpoint is required")
+
+    subscription = PushSubscription.active().filter_by(
+        endpoint=endpoint, user_id=user.id
+    ).first()
+    if subscription is not None:
+        subscription.soft_delete()
+        db.session.commit()
+    return jsonify({"status": "unsubscribed"})
 
 
 @api.get("/pools/<slug>/matches")

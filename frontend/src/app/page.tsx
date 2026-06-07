@@ -15,6 +15,7 @@ import {
 } from "@chakra-ui/react";
 import {
   BarChart2,
+  Bell,
   CheckCircle,
   Globe,
   Link2,
@@ -87,6 +88,24 @@ const FEATURES = [
     title: "Convite por link",
     description:
       "Cada bolão tem um link único. Compartilhe onde quiser — qualquer pessoa entra com um clique.",
+  },
+  {
+    icon: Bell,
+    color: "#276749",
+    bg: "green.50",
+    borderColor: "#c6f6d5",
+    title: "Lembretes de palpites",
+    description:
+      "Receba uma notificação push antes dos jogos quando ainda tiver palpites pendentes. Nunca mais perca um jogo sem palpitar.",
+  },
+  {
+    icon: BarChart2,
+    color: "#2F855A",
+    bg: "green.50",
+    borderColor: "#9ae6b4",
+    title: "Prévia do ranking",
+    description:
+      "Seja notificado assim que o ranking for atualizado ao final de cada rodada. Acompanhe a disputa em tempo real.",
   },
 ];
 
@@ -368,7 +387,7 @@ export default function Home() {
           </Heading>
         </Stack>
 
-        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={5}>
+        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={5}>
           {FEATURES.map((feat) => (
             <Card.Root
               key={feat.title}
@@ -508,6 +527,7 @@ export default function Home() {
             { icon: Users, text: "Sem limite de participantes" },
             { icon: CheckCircle, text: "Login com Google" },
             { icon: Share2, text: "Compartilhe fácil" },
+            { icon: Bell, text: "Notificações push" },
           ].map((item) => (
             <Badge
               key={item.text}
