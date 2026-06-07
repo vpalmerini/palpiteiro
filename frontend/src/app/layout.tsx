@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Box, Container } from "@chakra-ui/react";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -11,6 +11,13 @@ export const metadata: Metadata = {
   title: "Palpiteiro",
   description: "Crie bolões, faça seus palpites e dispute o ranking com amigos.",
   applicationName: "Palpiteiro",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icon-512.png" },
+  appleWebApp: { capable: true, title: "Palpiteiro", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#059669",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

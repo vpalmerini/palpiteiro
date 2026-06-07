@@ -59,4 +59,12 @@ def create_app(config_object=Config):
 
         print(seed_database())
 
+    @app.cli.command("send-reminders")
+    def send_reminders():
+        """Notify participants who have pending predictions for today's games."""
+        from .reminders import send_pending_prediction_reminders
+
+        count = send_pending_prediction_reminders()
+        print(f"sent {count} reminders")
+
     return app

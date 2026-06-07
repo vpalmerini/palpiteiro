@@ -35,3 +35,6 @@ class Config:
         "true",
         "yes",
     } or os.getenv("FLASK_ENV") == "production"
+    VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+    VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:admin@example.com")

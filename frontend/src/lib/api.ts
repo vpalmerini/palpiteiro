@@ -448,3 +448,26 @@ export function adminUpdateTournamentAwards(
     body: JSON.stringify(payload),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+export type PushSubscriptionPayload = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
+export function subscribePush(subscription: PushSubscriptionPayload) {
+  return request<{ status: string }>("/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify(subscription),
+  });
+}
+
+export function unsubscribePush(endpoint: string) {
+  return request<{ status: string }>("/push/unsubscribe", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
+  });
+}
