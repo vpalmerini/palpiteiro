@@ -177,6 +177,11 @@ export function EnableNotifications() {
           Ativar lembretes de palpites
         </Button>
       )}
+      {!enabled && (
+        <Text color="fg.muted" fontSize="sm" mt={2}>
+          Ative para receber lembretes quando tiver palpites pendentes. As notificações chegam algumas horas antes dos jogos do dia.
+        </Text>
+      )}
       {error ? <Text color="red.600" fontSize="sm" mt={2}>{error}</Text> : null}
     </Box>
   );
