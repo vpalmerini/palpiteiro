@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Crie bolões, faça seus palpites e dispute o ranking com amigos.",
   applicationName: "Palpiteiro",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon.svg", apple: "/icon-512.png" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
   appleWebApp: { capable: true, title: "Palpiteiro", statusBarStyle: "default" },
 };
 

@@ -11,7 +11,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Palpiteiro";
   const options = {
     body: data.body || "",
-    icon: "/icon-512.png",
+    icon: "/icon.svg",
     badge: "/icon.svg",
     data: { url: data.url || "/" },
   };

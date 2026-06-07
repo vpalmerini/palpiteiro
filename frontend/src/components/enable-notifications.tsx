@@ -20,7 +20,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 async function ensureSubscription() {
-  const registration = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.register("/sw.js");
+  const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -32,6 +33,15 @@ async function ensureSubscription() {
   await subscribePush({
     endpoint: json.endpoint,
     keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+  });
+}
+
+async function showWelcomeNotification() {
+  const registration = await navigator.serviceWorker.ready;
+  await registration.showNotification("Palpiteiro ativado!", {
+    body: "Você receberá lembretes quando tiver palpites pendentes.",
+    icon: "/icon.svg",
+    badge: "/icon.svg",
   });
 }
 
@@ -81,6 +91,7 @@ export function EnableNotifications() {
       setPermission(permissionResult);
       if (permissionResult !== "granted") return;
       await ensureSubscription();
+      await showWelcomeNotification();
       setEnabled(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível ativar as notificações.");
