@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from flask import current_app
+
 from .extensions import db
 from .models import (
     Match,
@@ -18,8 +20,12 @@ from .models import (
 from .push import send_to_user
 
 BRT = ZoneInfo("America/Sao_Paulo")
-REMINDER_WINDOW = timedelta(hours=3)
 KIND = "pending_predictions"
+
+
+def _reminder_window() -> timedelta:
+    hours = current_app.config.get("REMINDER_WINDOW_HOURS", 3)
+    return timedelta(hours=hours)
 
 
 def _as_aware_utc(value: datetime) -> datetime:
@@ -55,7 +61,7 @@ def send_pending_prediction_reminders(now: datetime | None = None) -> int:
             continue
 
         first_start = min(_as_aware_utc(m.starts_at) for m in todays)
-        if not (first_start - REMINDER_WINDOW <= now < first_start):
+        if not (first_start - _reminder_window() <= now < first_start):
             continue
 
         open_ids = {m.id for m in todays if _as_aware_utc(m.starts_at) > now}
