@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Text } from "@chakra-ui/react";
 import { Bell } from "lucide-react";
 
-import { subscribePush } from "@/lib/api";
+import { subscribePush, unsubscribePush } from "@/lib/api";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -19,14 +19,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
-async function ensureSubscription() {
+async function ensureSubscription(): Promise<PushSubscription> {
   await navigator.serviceWorker.register("/sw.js");
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.subscribe({
+  const sub = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
   });
-  const json = subscription.toJSON();
+  const json = sub.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
     throw new Error("Subscription inválida.");
   }
@@ -34,6 +34,7 @@ async function ensureSubscription() {
     endpoint: json.endpoint,
     keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
   });
+  return sub;
 }
 
 async function showWelcomeNotification() {
@@ -53,6 +54,7 @@ export function EnableNotifications() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [subscription, setSubscription] = useState<PushSubscription | null>(null);
 
   useEffect(() => {
     const isSupported =
@@ -76,7 +78,10 @@ export function EnableNotifications() {
     // If already granted, silently make sure the device is registered on the server.
     if (Notification.permission === "granted" && VAPID_PUBLIC_KEY) {
       ensureSubscription()
-        .then(() => setEnabled(true))
+        .then((sub) => {
+          setEnabled(true);
+          setSubscription(sub);
+        })
         .catch(() => {
           /* non-blocking: user can retry via the button */
         });
@@ -90,9 +95,10 @@ export function EnableNotifications() {
       const permissionResult = await Notification.requestPermission();
       setPermission(permissionResult);
       if (permissionResult !== "granted") return;
-      await ensureSubscription();
+      const sub = await ensureSubscription();
       await showWelcomeNotification();
       setEnabled(true);
+      setSubscription(sub);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível ativar as notificações.");
     } finally {
@@ -100,7 +106,24 @@ export function EnableNotifications() {
     }
   }, []);
 
-  if (!supported || !VAPID_PUBLIC_KEY || enabled) return null;
+  const disable = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (subscription) {
+        await unsubscribePush(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+      setEnabled(false);
+      setSubscription(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível desativar as notificações.");
+    } finally {
+      setBusy(false);
+    }
+  }, [subscription]);
+
+  if (!supported || !VAPID_PUBLIC_KEY) return null;
 
   // On iOS, Web Push only works when the app is installed to the home screen.
   if (isIOS && !isStandalone) {
@@ -127,17 +150,32 @@ export function EnableNotifications() {
 
   return (
     <Box>
-      <Button
-        onClick={enable}
-        loading={busy}
-        size="sm"
-        variant="outline"
-        rounded="lg"
-        alignSelf="flex-start"
-      >
-        <Bell size={15} />
-        Ativar lembretes de palpites
-      </Button>
+      {enabled ? (
+        <Button
+          onClick={disable}
+          loading={busy}
+          size="sm"
+          variant="ghost"
+          rounded="lg"
+          alignSelf="flex-start"
+          color="fg.muted"
+        >
+          <Bell size={15} />
+          Desativar lembretes
+        </Button>
+      ) : (
+        <Button
+          onClick={enable}
+          loading={busy}
+          size="sm"
+          variant="outline"
+          rounded="lg"
+          alignSelf="flex-start"
+        >
+          <Bell size={15} />
+          Ativar lembretes de palpites
+        </Button>
+      )}
       {error ? <Text color="red.600" fontSize="sm" mt={2}>{error}</Text> : null}
     </Box>
   );
