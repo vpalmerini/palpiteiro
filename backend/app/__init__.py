@@ -1,4 +1,7 @@
-from flask import Flask, jsonify
+import logging
+import sys
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
 
@@ -9,9 +12,27 @@ from .routes import api
 migrate = Migrate()
 
 
+def _configure_logging(app: Flask) -> None:
+    """Stream JSON-friendly logs to stdout so Railway captures them."""
+    if not app.debug:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%SZ",
+        )
+        handler.setFormatter(formatter)
+        app.logger.handlers = [handler]
+        app.logger.setLevel(logging.INFO)
+        # Also capture werkzeug request logs at INFO
+        logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+
 def create_app(config_object=Config):
     app = Flask(__name__)
     app.config.from_object(config_object)
+
+    _configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -24,12 +45,21 @@ def create_app(config_object=Config):
     app.register_blueprint(api)
 
     @app.errorhandler(400)
+    @app.errorhandler(401)
     @app.errorhandler(403)
     @app.errorhandler(404)
     @app.errorhandler(409)
     @app.errorhandler(422)
+    @app.errorhandler(502)
     def handle_error(error):
         return jsonify({"error": error.description}), error.code
+
+    @app.errorhandler(500)
+    def handle_server_error(error):
+        app.logger.exception(
+            "500 on %s %s", request.method, request.path
+        )
+        return jsonify({"error": "internal server error"}), 500
 
     @app.cli.command("init-db")
     def init_db():

@@ -374,9 +374,11 @@ def health():
 @api.post("/auth/google")
 def auth_google():
     """Verify a Google ID token, upsert the User, and issue a session cookie."""
-    from datetime import timezone as _tz
+    import requests as http_requests
 
     from flask import current_app
+
+    logger = current_app.logger
 
     data = _json()
     credential = data.get("credential")
@@ -385,38 +387,58 @@ def auth_google():
 
     client_id = current_app.config.get("GOOGLE_CLIENT_ID")
     if not client_id:
+        logger.error("auth_google: GOOGLE_CLIENT_ID not set")
         abort(500, description="Google client ID not configured on server")
 
+    logger.info("auth_google: verifying Google ID token")
     try:
         from google.auth.transport import requests as google_requests
         from google.oauth2 import id_token as google_id_token
 
+        session = http_requests.Session()
+        session.request = lambda method, url, **kwargs: (  # type: ignore[method-assign]
+            http_requests.Session.request(session, method, url, timeout=10, **kwargs)
+        )
         id_info = google_id_token.verify_oauth2_token(
             credential,
-            google_requests.Request(),
+            google_requests.Request(session=session),
             client_id,
         )
     except ValueError as exc:
+        logger.warning("auth_google: invalid token — %s", type(exc).__name__)
         abort(401, description=f"invalid Google token: {exc}")
+    except Exception as exc:
+        logger.exception("auth_google: token verification failed (%s)", type(exc).__name__)
+        abort(502, description="could not verify Google token — please try again")
 
     google_id = id_info["sub"]
     email = id_info.get("email", "")
     name = id_info.get("name") or email
     picture = id_info.get("picture")
 
-    user = User.query.filter_by(google_id=google_id).first()
-    if user is not None and user.is_deleted:
-        user.restore()
-    elif user is None:
-        user = User(google_id=google_id, email=email, name=name, picture_url=picture)
-        db.session.add(user)
-    else:
-        user.name = name
-        user.email = email
-        user.picture_url = picture
-    user.last_login_at = datetime.now(timezone.utc)
-    db.session.commit()
+    logger.info("auth_google: token valid, looking up user")
 
+    try:
+        user = User.query.filter_by(google_id=google_id).first()
+        if user is not None and user.is_deleted:
+            user.restore()
+            logger.info("auth_google: restored soft-deleted user id=%s", user.id)
+        elif user is None:
+            user = User(google_id=google_id, email=email, name=name, picture_url=picture)
+            db.session.add(user)
+            logger.info("auth_google: created new user")
+        else:
+            user.name = name
+            user.email = email
+            user.picture_url = picture
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.exception("auth_google: DB error during upsert (%s)", type(exc).__name__)
+        abort(500, description="database error during login")
+
+    logger.info("auth_google: session issued for user id=%s", user.id)
     token = make_session_jwt(user.id)
     response = jsonify(_user_payload(user))
     set_cookie(response, token)
