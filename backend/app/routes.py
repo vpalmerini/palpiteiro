@@ -374,8 +374,6 @@ def health():
 @api.post("/auth/google")
 def auth_google():
     """Verify a Google ID token, upsert the User, and issue a session cookie."""
-    import requests as http_requests
-
     from flask import current_app
 
     logger = current_app.logger
@@ -392,16 +390,21 @@ def auth_google():
 
     logger.info("auth_google: verifying Google ID token")
     try:
+        import requests as _requests
         from google.auth.transport import requests as google_requests
         from google.oauth2 import id_token as google_id_token
 
-        session = http_requests.Session()
-        session.request = lambda method, url, **kwargs: (  # type: ignore[method-assign]
-            http_requests.Session.request(session, method, url, timeout=10, **kwargs)
-        )
+        _session = _requests.Session()
+        _orig = _session.request
+
+        def _request_with_timeout(method, url, **kwargs):  # type: ignore[no-untyped-def]
+            kwargs.setdefault("timeout", 10)
+            return _orig(method, url, **kwargs)
+
+        _session.request = _request_with_timeout  # type: ignore[method-assign]
         id_info = google_id_token.verify_oauth2_token(
             credential,
-            google_requests.Request(session=session),
+            google_requests.Request(session=_session),
             client_id,
         )
     except ValueError as exc:
