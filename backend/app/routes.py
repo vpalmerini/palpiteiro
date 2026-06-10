@@ -405,10 +405,10 @@ def auth_google():
             client_id,
         )
     except ValueError as exc:
-        logger.warning("auth_google: invalid token — %s", exc)
+        logger.warning("auth_google: invalid token — %s", type(exc).__name__)
         abort(401, description=f"invalid Google token: {exc}")
     except Exception as exc:
-        logger.exception("auth_google: token verification failed — %s", exc)
+        logger.exception("auth_google: token verification failed (%s)", type(exc).__name__)
         abort(502, description="could not verify Google token — please try again")
 
     google_id = id_info["sub"]
@@ -416,7 +416,7 @@ def auth_google():
     name = id_info.get("name") or email
     picture = id_info.get("picture")
 
-    logger.info("auth_google: token valid for google_id=%s email=%s", google_id, email)
+    logger.info("auth_google: token valid, looking up user")
 
     try:
         user = User.query.filter_by(google_id=google_id).first()
@@ -426,7 +426,7 @@ def auth_google():
         elif user is None:
             user = User(google_id=google_id, email=email, name=name, picture_url=picture)
             db.session.add(user)
-            logger.info("auth_google: created new user email=%s", email)
+            logger.info("auth_google: created new user")
         else:
             user.name = name
             user.email = email
@@ -435,7 +435,7 @@ def auth_google():
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
-        logger.exception("auth_google: DB error for email=%s — %s", email, exc)
+        logger.exception("auth_google: DB error during upsert (%s)", type(exc).__name__)
         abort(500, description="database error during login")
 
     logger.info("auth_google: session issued for user id=%s", user.id)
