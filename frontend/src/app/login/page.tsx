@@ -35,9 +35,14 @@ function LoginContent() {
     try {
       await signInWithGoogle(credentialResponse.credential);
       router.replace(next);
-    } catch {
+    } catch (err) {
       setIsSigningIn(false);
-      setError("Não foi possível entrar com Google. Tente novamente.");
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("could not verify Google token")) {
+        setError("Serviço temporariamente indisponível. Aguarde alguns segundos e tente novamente.");
+      } else {
+        setError("Não foi possível entrar com Google. Tente novamente.");
+      }
     }
   }
 
