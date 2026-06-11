@@ -140,6 +140,7 @@ export function getPredictionSetup(slug: string) {
 export type UpdatePoolPayload = {
   name?: string;
   description?: string;
+  locked?: boolean;
   prizes?: { position: number; description: string }[];
   scoring?: { exactScore?: number; outcome?: number; oneTeamGoals?: number; penaltyBonus?: number };
   awards?: {

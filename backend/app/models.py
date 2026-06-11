@@ -277,6 +277,7 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
     top_scorer_points = db.Column(db.Integer, nullable=False, default=10)
     predict_best_player = db.Column(db.Boolean, nullable=False, default=False)
     best_player_points = db.Column(db.Integer, nullable=False, default=10)
+    locked = db.Column(db.Boolean, nullable=False, default=False)
 
     tournament = db.relationship("Tournament", backref="pools")
     creator = db.relationship("User", foreign_keys=[creator_user_id], backref="created_pools")

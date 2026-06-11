@@ -15,6 +15,7 @@ import {
   Separator,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   Textarea,
 } from "@chakra-ui/react";
@@ -213,6 +214,7 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
   const [prize3, setPrize3] = useState(pool.prizes.find((p) => p.position === 3)?.description ?? "");
   const [scoring, setScoring] = useState<ScoringState>({ ...pool.scoring });
   const [awards, setAwards] = useState<AwardsState>({ ...pool.awards });
+  const [isPoolLocked, setIsPoolLocked] = useState(pool.locked);
 
   const locked = pool.hasPredictions;
 
@@ -235,6 +237,14 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : "Erro ao salvar alterações.");
+    },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: (newLocked: boolean) => updatePool(slug, { locked: newLocked }),
+    onSuccess: (updatedPool) => {
+      setIsPoolLocked(updatedPool.locked);
+      void queryClient.invalidateQueries({ queryKey: poolKeys.detail(slug) });
     },
   });
 
@@ -374,6 +384,43 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
                 </HStack>
               </HStack>
             ))}
+          </Stack>
+
+          <Separator />
+
+          {/* Pool access lock */}
+          <Stack gap={3}>
+            <Heading size="sm">Acesso ao bolão</Heading>
+            <HStack gap={4} justify="space-between" align="flex-start">
+              <Stack gap={1} flex="1">
+                <Text fontSize="sm" fontWeight="medium">Bloquear novos entrantes</Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Quando ativado, ninguém mais poderá entrar neste bolão pelo link público. Participantes existentes não são afetados.
+                </Text>
+              </Stack>
+              <Switch.Root
+                checked={isPoolLocked}
+                onCheckedChange={(d) => {
+                  setIsPoolLocked(d.checked);
+                  lockMutation.mutate(d.checked);
+                }}
+                disabled={lockMutation.isPending}
+                colorPalette="red"
+              >
+                <Switch.HiddenInput />
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch.Root>
+            </HStack>
+            {isPoolLocked && (
+              <HStack gap={2}>
+                <Lock size={14} color="var(--chakra-colors-red-500)" />
+                <Text fontSize="xs" color="red.600" fontWeight="medium">
+                  Bolão bloqueado — novos participantes não podem entrar
+                </Text>
+              </HStack>
+            )}
           </Stack>
 
           {error && <Text color="red.600">{error}</Text>}

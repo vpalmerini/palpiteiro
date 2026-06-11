@@ -255,6 +255,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
             {"position": prize.position, "description": prize.description}
             for prize in prizes
         ],
+        "locked": pool.locked,
         "awardsLocked": _awards_locked(pool),
         "awards": {
             "champion": {"enabled": pool.predict_champion, "points": pool.champion_points},
@@ -567,6 +568,9 @@ def update_pool(slug):
             abort(400, description="name cannot be empty")
         pool.name = name
 
+    if "locked" in data:
+        pool.locked = bool(data["locked"])
+
     if "description" in data:
         pool.description = (data.get("description") or "").strip() or None
 
@@ -703,6 +707,11 @@ def join_pool(slug):
     data = _json()
     nickname = (data.get("nickname") or "").strip()
     display_name = nickname or user.name
+
+    if pool.locked:
+        existing = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()
+        if existing is None:
+            abort(403, description="Este bolão está bloqueado para novos participantes")
 
     banned = PoolParticipant.query.filter_by(
         pool_id=pool.id, user_id=user.id, removed_by_creator=True
