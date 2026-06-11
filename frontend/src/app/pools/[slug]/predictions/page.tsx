@@ -702,6 +702,12 @@ export default function PredictionsPage({ params }: PageProps) {
                         Sem palpite
                       </Badge>
                     )}
+                    {match.homeScore !== null && match.awayScore !== null && (
+                      <Badge colorPalette="blue" variant="subtle" rounded="full" fontSize="xs">
+                        Placar final: {match.homeScore} x {match.awayScore}
+                        {match.wentToPenalties ? " (pen.)" : ""}
+                      </Badge>
+                    )}
                     {prediction?.score != null && (
                       <Badge
                         colorPalette={prediction.score.points > 0 ? "yellow" : "gray"}

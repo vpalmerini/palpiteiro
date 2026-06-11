@@ -505,16 +505,26 @@ export default function PoolPage({ params }: PageProps) {
 
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
+          {(() => {
+            const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+            const upcomingMatches = matches.filter(
+              (m) => new Date(m.startsAt).getTime() + TWO_HOURS_MS > Date.now()
+            );
+            return (
+          <>
           <HStack justify="space-between" align="center">
             <Card.Title><HStack gap={2}><CalendarDays size={18} />Próximos jogos</HStack></Card.Title>
-            {matches.length > 6 && (
+            {upcomingMatches.length > 6 && (
               <Button asChild size="xs" variant="ghost" colorPalette="green">
-                <Link href={`/pools/${slug}/predictions`} {...prefetchProps}>Ver todos ({matches.length})</Link>
+                <Link href={`/pools/${slug}/predictions`} {...prefetchProps}>Ver todos ({upcomingMatches.length})</Link>
               </Button>
             )}
           </HStack>
+          {upcomingMatches.length === 0 ? (
+            <Text color="fg.muted" fontSize="sm">Nenhum jogo próximo.</Text>
+          ) : (
           <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
-            {matches.slice(0, 6).map((match) => {
+            {upcomingMatches.slice(0, 6).map((match) => {
               const hasPrediction = predictedMatchIds.has(match.id);
               return (
                 <Card.Root
@@ -561,6 +571,10 @@ export default function PoolPage({ params }: PageProps) {
               );
             })}
           </SimpleGrid>
+          )}
+          </>
+            );
+          })()}
         </Card.Body>
       </Card.Root>
     </Stack>
