@@ -17,7 +17,7 @@ import {
   Text,
   Separator,
 } from "@chakra-ui/react";
-import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -679,14 +679,24 @@ export default function PredictionsPage({ params }: PageProps) {
                         {match.group.name}
                       </Badge>
                     )}
-                    <Text color="fg.muted" fontSize="xs">
-                      {new Date(match.startsAt).toLocaleString("pt-BR", {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </Text>
+                    <HStack gap={1} color="fg.muted">
+                      <CalendarDays size={11} />
+                      <Text fontSize="xs">
+                        {new Date(match.startsAt).toLocaleDateString("pt-BR", {
+                          weekday: "short",
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </Text>
+                      <Text fontSize="xs" color="border">·</Text>
+                      <Clock size={11} />
+                      <Text fontSize="xs">
+                        {new Date(match.startsAt).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </HStack>
                   </Stack>
                   <Stack direction="row" align="center" flexWrap="wrap" gap={2}>
                     {isDirty ? (
