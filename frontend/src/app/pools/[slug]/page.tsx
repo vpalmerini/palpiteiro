@@ -506,10 +506,7 @@ export default function PoolPage({ params }: PageProps) {
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
           {(() => {
-            const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-            const upcomingMatches = matches.filter(
-              (m) => new Date(m.startsAt).getTime() + TWO_HOURS_MS > Date.now()
-            );
+            const upcomingMatches = matches.filter((m) => !m.isLocked);
             return (
           <>
           <HStack justify="space-between" align="center">
