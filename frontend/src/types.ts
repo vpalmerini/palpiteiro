@@ -31,6 +31,7 @@ export type Pool = {
   hasPredictions: boolean;
   isParticipant: boolean;
   isRemoved: boolean;
+  locked: boolean;
   participantsCount: number;
   awardsLocked: boolean;
   scoring: {
