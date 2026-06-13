@@ -26,7 +26,7 @@ SHORT_NAME_TO_EXTERNAL_ID: dict[str, int] = {
     "GER": 759, "CUW": 9460, "CIV": 1935, "ECU": 791,
     "NED": 8601, "JPN": 766, "SWE": 792, "TUN": 802,
     "BEL": 805, "EGY": 825, "IRN": 840, "NZL": 783,
-    "ESP": 760, "CPV": 1930, "SAU": 801, "URU": 758,
+    "ESP": 760, "CPV": 1930, "SAU": 801, "KSA": 801, "URU": 758,
     "FRA": 773, "SEN": 804, "IRQ": 8062, "NOR": 8872,
     "AUT": 816, "JOR": 8049, "ARG": 762, "ALG": 778,
     "POR": 765, "COD": 1934, "UZB": 8070, "COL": 818,
