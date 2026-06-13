@@ -19,6 +19,7 @@ import {
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CalendarDays, Clock } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/auth";
 import {
@@ -58,15 +59,9 @@ import type { AdminPool, EntityId, Match, Round, Stage, Team, TournamentGroup, T
 // Tournament selector
 // ---------------------------------------------------------------------------
 
-function TournamentSidebar({
-  tournaments,
-  selectedId,
-  onSelect,
+function TournamentCreateForm({
   onCreated,
 }: {
-  tournaments: Tournament[];
-  selectedId: EntityId | null;
-  onSelect: (id: EntityId) => void;
   onCreated: (t: Tournament) => void;
 }) {
   const [name, setName] = useState("");
@@ -90,6 +85,52 @@ function TournamentSidebar({
   }
 
   return (
+    <Card.Root rounded="xl">
+      <Card.Body gap={3}>
+        <Card.Title fontSize="sm">Novo torneio</Card.Title>
+        <form onSubmit={handleSubmit}>
+          <Stack gap={3}>
+            <Field.Root required>
+              <Field.Label>Nome</Field.Label>
+              <Input
+                size="sm"
+                placeholder="Copa do Mundo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>Ano</Field.Label>
+              <Input
+                size="sm"
+                type="number"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+              />
+            </Field.Root>
+            {error && <Text color="red.500" fontSize="sm">{error}</Text>}
+            <Button type="submit" size="sm" colorPalette="blue" loading={submitting}>
+              Criar
+            </Button>
+          </Stack>
+        </form>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+function TournamentSidebar({
+  tournaments,
+  selectedId,
+  onSelect,
+  onCreated,
+}: {
+  tournaments: Tournament[];
+  selectedId: EntityId | null;
+  onSelect: (id: EntityId) => void;
+  onCreated: (t: Tournament) => void;
+}) {
+  return (
     <Stack gap={4} minW="220px">
       <Heading size="md">Torneios</Heading>
       <Stack gap={1}>
@@ -112,37 +153,7 @@ function TournamentSidebar({
         )}
       </Stack>
 
-      <Card.Root rounded="xl">
-        <Card.Body gap={3}>
-          <Card.Title fontSize="sm">Novo torneio</Card.Title>
-          <form onSubmit={handleSubmit}>
-            <Stack gap={3}>
-              <Field.Root required>
-                <Field.Label>Nome</Field.Label>
-                <Input
-                  size="sm"
-                  placeholder="Copa do Mundo"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </Field.Root>
-              <Field.Root required>
-                <Field.Label>Ano</Field.Label>
-                <Input
-                  size="sm"
-                  type="number"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                />
-              </Field.Root>
-              {error && <Text color="red.500" fontSize="sm">{error}</Text>}
-              <Button type="submit" size="sm" colorPalette="blue" loading={submitting}>
-                Criar
-              </Button>
-            </Stack>
-          </form>
-        </Card.Body>
-      </Card.Root>
+      <TournamentCreateForm onCreated={onCreated} />
     </Stack>
   );
 }
@@ -296,12 +307,13 @@ function TournamentTeamsPanel({
       {tournamentTeams.length === 0 ? (
         <Text color="gray.500" fontSize="sm">Nenhum time adicionado a este torneio ainda.</Text>
       ) : (
+        <Box overflowX="auto">
         <Table.Root size="sm" variant="outline" rounded="xl" overflow="hidden">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Nome</Table.ColumnHeader>
-              <Table.ColumnHeader>Sigla</Table.ColumnHeader>
-              <Table.ColumnHeader>Tipo</Table.ColumnHeader>
+              <Table.ColumnHeader display={{ base: "none", md: "table-cell" }}>Sigla</Table.ColumnHeader>
+              <Table.ColumnHeader display={{ base: "none", md: "table-cell" }}>Tipo</Table.ColumnHeader>
               <Table.ColumnHeader>Bandeira / Logo</Table.ColumnHeader>
               <Table.ColumnHeader>Grupo</Table.ColumnHeader>
               <Table.ColumnHeader />
@@ -314,8 +326,8 @@ function TournamentTeamsPanel({
                 <>
                   <Table.Row key={t.id}>
                     <Table.Cell>{t.name}</Table.Cell>
-                    <Table.Cell>{t.shortName ? <Badge variant="subtle">{t.shortName}</Badge> : <Text color="gray.400" fontSize="xs">—</Text>}</Table.Cell>
-                    <Table.Cell>
+                    <Table.Cell display={{ base: "none", md: "table-cell" }}>{t.shortName ? <Badge variant="subtle">{t.shortName}</Badge> : <Text color="gray.400" fontSize="xs">—</Text>}</Table.Cell>
+                    <Table.Cell display={{ base: "none", md: "table-cell" }}>
                       <Badge colorPalette={TEAM_TYPE_COLORS[t.teamType] ?? "gray"} variant="subtle">
                         {TEAM_TYPE_LABELS[t.teamType] ?? t.teamType}
                       </Badge>
@@ -392,6 +404,7 @@ function TournamentTeamsPanel({
             })}
           </Table.Body>
         </Table.Root>
+        </Box>
       )}
 
       {!isFinished && (
@@ -595,11 +608,12 @@ function StagesPanel({
   const sorted = [...stages].sort((a, b) => a.order - b.order);
 
   return (
-    <Stack gap={4}>
+    <Stack gap={6}>
       <Heading size="sm">Fases</Heading>
       {sorted.length === 0 ? (
         <Text color="gray.500" fontSize="sm">Nenhuma fase cadastrada.</Text>
       ) : (
+        <Box overflowX="auto">
         <Table.Root size="sm" variant="outline" rounded="xl" overflow="hidden">
           <Table.Header>
             <Table.Row>
@@ -674,6 +688,7 @@ function StagesPanel({
             )}
           </Table.Body>
         </Table.Root>
+        </Box>
       )}
 
       {sorted.filter((s) => s.stageType === "group").map((s) => (
@@ -784,40 +799,42 @@ function GroupsSubPanel({
   }
 
   return (
-    <Stack gap={2} pl={4} borderLeftWidth="2px" borderColor="blue.100">
+    <Stack gap={3} pl={4} borderLeftWidth="2px" borderColor="blue.100">
       <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">
         Grupos de {stage.name}
       </Text>
       {groups.length === 0 ? (
         <Text fontSize="sm" color="gray.400">Nenhum grupo criado.</Text>
       ) : (
-        <Stack gap={1}>
+        <Stack gap={2}>
           {groups.map((g) =>
             editingId === g.id ? (
-              <HStack key={g.id} gap={2}>
-                <Input size="xs" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
-                <Button size="xs" colorPalette="green" onClick={() => handleRename(g.id)}>Salvar</Button>
-                <Button size="xs" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+              <HStack key={g.id} gap={2} flexWrap="wrap">
+                <Input size="sm" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus flex={1} minW="120px" />
+                <HStack gap={1}>
+                  <Button size="sm" colorPalette="green" onClick={() => handleRename(g.id)}>Salvar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+                </HStack>
               </HStack>
             ) : (
-              <HStack key={g.id} gap={2} justify="space-between">
-                <Badge variant="subtle" colorPalette="blue">{g.name}</Badge>
+              <Stack key={g.id} gap={1}>
+                <Badge variant="subtle" colorPalette="blue" alignSelf="flex-start">{g.name}</Badge>
                 {!isFinished && (
                   <HStack gap={1}>
-                    <Button size="xs" variant="ghost" onClick={() => { setEditingId(g.id); setEditName(g.name); }}>Renomear</Button>
-                    <Button size="xs" variant="ghost" colorPalette="red" onClick={() => handleDelete(g.id)}>Deletar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setEditingId(g.id); setEditName(g.name); }}>Renomear</Button>
+                    <Button size="sm" variant="ghost" colorPalette="red" onClick={() => handleDelete(g.id)}>Deletar</Button>
                   </HStack>
                 )}
-              </HStack>
+              </Stack>
             )
           )}
         </Stack>
       )}
       {!isFinished && (
         <form onSubmit={handleCreate}>
-          <HStack gap={2}>
-            <Input size="xs" placeholder="Grupo A" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <Button type="submit" size="xs" colorPalette="blue" loading={creating} disabled={!newName.trim()}>
+          <HStack gap={2} flexWrap="wrap">
+            <Input size="sm" placeholder="Grupo A" value={newName} onChange={(e) => setNewName(e.target.value)} flex={1} minW="120px" />
+            <Button type="submit" size="sm" colorPalette="blue" loading={creating} disabled={!newName.trim()}>
               + Grupo
             </Button>
           </HStack>
@@ -883,39 +900,41 @@ function RoundsSubPanel({
   }
 
   return (
-    <Stack gap={2} pl={4} borderLeftWidth="2px" borderColor="teal.100">
+    <Stack gap={3} pl={4} borderLeftWidth="2px" borderColor="teal.100">
       <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide">
         Rodadas de {stage.name}
       </Text>
       {rounds.length === 0 ? (
         <Text fontSize="sm" color="gray.400">Nenhuma rodada criada.</Text>
       ) : (
-        <Stack gap={1}>
+        <Stack gap={3}>
           {rounds.map((r) =>
             editingId === r.id ? (
-              <HStack key={r.id} gap={2}>
+              <HStack key={r.id} gap={2} flexWrap="wrap">
                 <Input
-                  size="xs"
+                  size="sm"
                   type="number"
                   w="20"
                   value={editNumber}
                   onChange={(e) => setEditNumber(e.target.value)}
                   autoFocus
                 />
-                <Button size="xs" colorPalette="green" onClick={() => handleRenumber(r.id)}>Salvar</Button>
-                <Button size="xs" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+                <HStack gap={1}>
+                  <Button size="sm" colorPalette="green" onClick={() => handleRenumber(r.id)}>Salvar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
+                </HStack>
               </HStack>
             ) : (
-              <HStack key={r.id} gap={2} justify="space-between" flexWrap="wrap">
+              <Stack key={r.id} gap={1.5}>
                 <HStack gap={2}>
                   <Badge variant="subtle" colorPalette="teal">{ordinalRound(r.number)}</Badge>
                   {snapshotDone[r.id] && (
                     <Text fontSize="xs" color="green.600">✓ snapshot {snapshotDone[r.id]}</Text>
                   )}
                 </HStack>
-                <HStack gap={1}>
+                <HStack gap={1} flexWrap="wrap">
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="outline"
                     colorPalette="teal"
                     loading={snapshotting === r.id}
@@ -933,28 +952,28 @@ function RoundsSubPanel({
                   </Button>
                   {!isFinished && (
                     <>
-                      <Button size="xs" variant="ghost" onClick={() => { setEditingId(r.id); setEditNumber(String(r.number)); }}>Renumerar</Button>
-                      <Button size="xs" variant="ghost" colorPalette="red" onClick={() => handleDelete(r.id)}>Deletar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingId(r.id); setEditNumber(String(r.number)); }}>Renumerar</Button>
+                      <Button size="sm" variant="ghost" colorPalette="red" onClick={() => handleDelete(r.id)}>Deletar</Button>
                     </>
                   )}
                 </HStack>
-              </HStack>
+              </Stack>
             )
           )}
         </Stack>
       )}
       {!isFinished && (
         <form onSubmit={handleCreate}>
-          <HStack gap={2}>
+          <HStack gap={2} flexWrap="wrap">
             <Input
-              size="xs"
+              size="sm"
               type="number"
               placeholder={String(rounds.length + 1)}
               w="20"
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value)}
             />
-            <Button type="submit" size="xs" colorPalette="teal" loading={creating} disabled={!newNumber.trim()}>
+            <Button type="submit" size="sm" colorPalette="teal" loading={creating} disabled={!newNumber.trim()}>
               + Rodada
             </Button>
           </HStack>
@@ -1078,7 +1097,7 @@ function MatchRow({
   return (
     <Card.Root rounded="xl" borderWidth="1px">
       <Card.Body gap={3}>
-        <HStack justify="space-between" flexWrap="wrap" gap={2}>
+        <Stack gap={2}>
           <Stack gap={1}>
             <HStack gap={2} flexWrap="wrap">
               <Badge colorPalette={STAGE_TYPE_COLORS[match.stage.stageType] ?? "gray"} variant="subtle" rounded="full">
@@ -1101,24 +1120,39 @@ function MatchRow({
             <Text fontWeight="semibold">
               {match.homeTeam?.name ?? "A definir"} × {match.awayTeam?.name ?? "A definir"}
             </Text>
-            <Text fontSize="sm" color="gray.600">
-              {new Date(match.startsAt).toLocaleString("pt-BR")}
-              {match.status === "finished" && match.homeScore !== null && (
-                <> — Resultado: {match.homeScore} × {match.awayScore}
-                  {match.wentToPenalties && " (pen.)"}
-                </>
-              )}
-            </Text>
+            <HStack gap={1} color="fg.muted" flexWrap="wrap">
+              <CalendarDays size={11} />
+              <Text fontSize="xs">
+                {new Date(match.startsAt).toLocaleDateString("pt-BR", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "short",
+                })}
+              </Text>
+              <Text fontSize="xs" color="border">·</Text>
+              <Clock size={11} />
+              <Text fontSize="xs">
+                {new Date(match.startsAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </HStack>
+            {match.status === "finished" && match.homeScore !== null && (
+              <Badge colorPalette="blue" variant="subtle" rounded="full" fontSize="xs" alignSelf="flex-start">
+                Placar final: {match.homeScore} × {match.awayScore}{match.wentToPenalties ? " (pen.)" : ""}
+              </Badge>
+            )}
           </Stack>
-          <HStack gap={2}>
-            <Button size="xs" variant="outline" disabled={isFinished} onClick={() => { setEditOpen((v) => !v); setResultOpen(false); setError(null); }}>
+          <HStack gap={2} flexWrap="wrap">
+            <Button size="sm" variant="outline" disabled={isFinished} onClick={() => { setEditOpen((v) => !v); setResultOpen(false); setError(null); }}>
               {editOpen ? "Cancelar" : "Editar"}
             </Button>
-            <Button size="xs" variant="outline" colorPalette="green" disabled={isFinished} onClick={() => { setResultOpen((v) => !v); setEditOpen(false); setError(null); }}>
+            <Button size="sm" variant="outline" colorPalette="green" disabled={isFinished} onClick={() => { setResultOpen((v) => !v); setEditOpen(false); setError(null); }}>
               {resultOpen ? "Cancelar" : "Resultado"}
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               colorPalette="red"
               disabled={isFinished}
@@ -1131,7 +1165,7 @@ function MatchRow({
               Deletar
             </Button>
           </HStack>
-        </HStack>
+        </Stack>
 
         {editOpen && (
           <form onSubmit={saveEdit}>
@@ -1459,25 +1493,26 @@ function PoolsPanel({ pools }: { pools: AdminPool[] }) {
   }
 
   return (
-    <Table.Root size="sm" variant="outline" rounded="xl" overflow="hidden">
+    <Box overflowX="auto">
+    <Table.Root size="sm" variant="outline" rounded="xl" overflow="hidden" minW="max-content">
       <Table.Header>
         <Table.Row>
-          <Table.ColumnHeader>Nome</Table.ColumnHeader>
-          <Table.ColumnHeader>Criador</Table.ColumnHeader>
-          <Table.ColumnHeader>Participantes</Table.ColumnHeader>
-          <Table.ColumnHeader>Criado em</Table.ColumnHeader>
+          <Table.ColumnHeader whiteSpace="nowrap">Nome</Table.ColumnHeader>
+          <Table.ColumnHeader whiteSpace="nowrap">Criador</Table.ColumnHeader>
+          <Table.ColumnHeader whiteSpace="nowrap">Participantes</Table.ColumnHeader>
+          <Table.ColumnHeader whiteSpace="nowrap">Criado em</Table.ColumnHeader>
           <Table.ColumnHeader />
         </Table.Row>
       </Table.Header>
       <Table.Body>
         {pools.map((pool) => (
           <Table.Row key={pool.id}>
-            <Table.Cell fontWeight="medium">{pool.name}</Table.Cell>
-            <Table.Cell>{pool.creatorName}</Table.Cell>
+            <Table.Cell fontWeight="medium" whiteSpace="nowrap">{pool.name}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">{pool.creatorName}</Table.Cell>
             <Table.Cell>{pool.participantsCount}</Table.Cell>
-            <Table.Cell>{new Date(pool.createdAt).toLocaleDateString("pt-BR")}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">{new Date(pool.createdAt).toLocaleDateString("pt-BR")}</Table.Cell>
             <Table.Cell>
-              <Button asChild size="xs" variant="ghost">
+              <Button asChild size="xs" variant="ghost" whiteSpace="nowrap">
                 <Link href={`/pools/${pool.slug}`}>Ver bolão →</Link>
               </Button>
             </Table.Cell>
@@ -1485,6 +1520,7 @@ function PoolsPanel({ pools }: { pools: AdminPool[] }) {
         ))}
       </Table.Body>
     </Table.Root>
+    </Box>
   );
 }
 
@@ -1732,12 +1768,12 @@ function TournamentDetail({
       )}
 
       <Tabs.Root defaultValue="jogos" variant="line">
-        <Tabs.List>
-          <Tabs.Trigger value="jogos">Jogos ({matches.length})</Tabs.Trigger>
-          <Tabs.Trigger value="boloes">Bolões ({pools.length})</Tabs.Trigger>
-          <Tabs.Trigger value="fases">Fases</Tabs.Trigger>
-          <Tabs.Trigger value="premiacoes">Premiações</Tabs.Trigger>
-          <Tabs.Trigger value="times">Times</Tabs.Trigger>
+        <Tabs.List overflowX="auto" overflowY="hidden" pb="1px" flexWrap="nowrap">
+          <Tabs.Trigger value="jogos" flexShrink={0}>Jogos ({matches.length})</Tabs.Trigger>
+          <Tabs.Trigger value="boloes" flexShrink={0}>Bolões ({pools.length})</Tabs.Trigger>
+          <Tabs.Trigger value="fases" flexShrink={0}>Fases</Tabs.Trigger>
+          <Tabs.Trigger value="premiacoes" flexShrink={0}>Premiações</Tabs.Trigger>
+          <Tabs.Trigger value="times" flexShrink={0}>Times</Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="jogos" pt={4}>
@@ -1802,6 +1838,7 @@ export default function AdminPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedId, setSelectedId] = useState<EntityId | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mobileShowCreate, setMobileShowCreate] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || !user.isAdmin)) {
@@ -1825,6 +1862,12 @@ export default function AdminPage() {
     setTeams((prev) => [...prev, team].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
+  function handleTournamentCreated(t: Tournament) {
+    setTournaments((prev) => [t, ...prev]);
+    setSelectedId(t.id);
+    setMobileShowCreate(false);
+  }
+
   if (authLoading || !user?.isAdmin) {
     return null;
   }
@@ -1844,16 +1887,49 @@ export default function AdminPage() {
         <Text color="gray.600">Gerencie torneios, jogos e resultados.</Text>
       </Stack>
 
+      {/* Mobile tournament selector */}
+      <Box display={{ base: "block", md: "none" }} mb={4}>
+        <Stack gap={3}>
+          <HStack gap={2}>
+            <NativeSelect.Root size="sm" flex={1}>
+              <NativeSelect.Field
+                value={selectedId != null ? String(selectedId) : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedId(val ? (val as EntityId) : null);
+                  setMobileShowCreate(false);
+                }}
+              >
+                {tournaments.length === 0 && <option value="">Nenhum torneio cadastrado</option>}
+                {tournaments.map((t) => (
+                  <option key={t.id} value={String(t.id)}>{t.name} {t.year}</option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <Button
+              size="sm"
+              variant={mobileShowCreate ? "solid" : "outline"}
+              colorPalette="blue"
+              onClick={() => setMobileShowCreate((v) => !v)}
+            >
+              {mobileShowCreate ? "Cancelar" : "+ Novo"}
+            </Button>
+          </HStack>
+          {mobileShowCreate && (
+            <TournamentCreateForm onCreated={handleTournamentCreated} />
+          )}
+        </Stack>
+      </Box>
+
       <SimpleGrid columns={{ base: 1, md: 4 }} gap={8} alignItems="flex-start">
-        <Box>
+        {/* Desktop sidebar */}
+        <Box display={{ base: "none", md: "block" }}>
           <TournamentSidebar
             tournaments={tournaments}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onCreated={(t) => {
-              setTournaments((prev) => [t, ...prev]);
-              setSelectedId(t.id);
-            }}
+            onCreated={handleTournamentCreated}
           />
         </Box>
 

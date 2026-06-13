@@ -563,9 +563,24 @@ export default function PoolPage({ params }: PageProps) {
                     <Text color="fg.muted" fontSize="xs">
                       {match.stage.name}{match.group ? ` · ${match.group.name}` : ""}
                     </Text>
-                    <Text color="fg.muted" fontSize="xs">
-                      {new Date(match.startsAt).toLocaleString("pt-BR")}
-                    </Text>
+                    <HStack gap={1} color="fg.muted" flexWrap="wrap">
+                      <CalendarDays size={11} />
+                      <Text fontSize="xs">
+                        {new Date(match.startsAt).toLocaleDateString("pt-BR", {
+                          weekday: "short",
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </Text>
+                      <Text fontSize="xs" color="border">·</Text>
+                      <Clock size={11} />
+                      <Text fontSize="xs">
+                        {new Date(match.startsAt).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </HStack>
                     <HStack justify="space-between" align="center" mt={1}>
                     <Badge
                       colorPalette={hasPrediction ? "green" : match.isLocked ? "red" : "gray"}
