@@ -8,4 +8,6 @@ pytest
 google-auth
 requests
 PyJWT
+pywebpush
+tzdata
 gunicorn

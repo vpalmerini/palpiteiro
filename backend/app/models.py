@@ -280,6 +280,7 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
     top_scorer_points = db.Column(db.Integer, nullable=False, default=10)
     predict_best_player = db.Column(db.Boolean, nullable=False, default=False)
     best_player_points = db.Column(db.Integer, nullable=False, default=10)
+    locked = db.Column(db.Boolean, nullable=False, default=False)
 
     tournament = db.relationship("Tournament", backref="pools")
     creator = db.relationship("User", foreign_keys=[creator_user_id], backref="created_pools")
@@ -490,4 +491,49 @@ class RoundSnapshotEntry(TimestampSoftDeleteMixin, db.Model):
         active_unique_index("uq_snapshot_entry_user_active", "snapshot_id", "user_id"),
         db.CheckConstraint("position >= 1", name="ck_snapshot_entry_position_positive"),
         db.CheckConstraint("points >= 0", name="ck_snapshot_entry_points_positive"),
+    )
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+class PushSubscription(TimestampSoftDeleteMixin, db.Model):
+    """A browser Web Push subscription for a user's device."""
+    __tablename__ = "push_subscriptions"
+
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
+    user_id = db.Column(
+        UUID,
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.String(255), nullable=False)
+    auth = db.Column(db.String(255), nullable=False)
+
+    user = db.relationship("User", backref="push_subscriptions")
+
+    __table_args__ = (
+        active_unique_index("uq_push_subscription_endpoint_active", "endpoint"),
+    )
+
+
+class NotificationLog(TimestampSoftDeleteMixin, db.Model):
+    """Dedup record so a user receives a given notification kind at most once per key."""
+    __tablename__ = "notification_logs"
+
+    id = db.Column(UUID, primary_key=True, default=_uuid4_str)
+    user_id = db.Column(
+        UUID,
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    kind = db.Column(db.String(64), nullable=False)
+    dedup_key = db.Column(db.String(64), nullable=False)
+
+    user = db.relationship("User", backref="notification_logs")
+
+    __table_args__ = (
+        active_unique_index("uq_notification_log_active", "user_id", "kind", "dedup_key"),
     )

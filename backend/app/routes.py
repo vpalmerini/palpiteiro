@@ -26,6 +26,7 @@ from .models import (
     PoolParticipant,
     PoolPrize,
     Prediction,
+    PushSubscription,
     Round,
     RoundSnapshot,
     RoundSnapshotEntry,
@@ -254,6 +255,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
             {"position": prize.position, "description": prize.description}
             for prize in prizes
         ],
+        "locked": pool.locked,
         "awardsLocked": _awards_locked(pool),
         "awards": {
             "champion": {"enabled": pool.predict_champion, "points": pool.champion_points},
@@ -373,9 +375,9 @@ def health():
 @api.post("/auth/google")
 def auth_google():
     """Verify a Google ID token, upsert the User, and issue a session cookie."""
-    from datetime import timezone as _tz
-
     from flask import current_app
+
+    logger = current_app.logger
 
     data = _json()
     credential = data.get("credential")
@@ -384,38 +386,63 @@ def auth_google():
 
     client_id = current_app.config.get("GOOGLE_CLIENT_ID")
     if not client_id:
+        logger.error("auth_google: GOOGLE_CLIENT_ID not set")
         abort(500, description="Google client ID not configured on server")
 
+    logger.info("auth_google: verifying Google ID token")
     try:
+        import requests as _requests
         from google.auth.transport import requests as google_requests
         from google.oauth2 import id_token as google_id_token
 
+        _session = _requests.Session()
+        _orig = _session.request
+
+        def _request_with_timeout(method, url, **kwargs):  # type: ignore[no-untyped-def]
+            kwargs.setdefault("timeout", 10)
+            return _orig(method, url, **kwargs)
+
+        _session.request = _request_with_timeout  # type: ignore[method-assign]
         id_info = google_id_token.verify_oauth2_token(
             credential,
-            google_requests.Request(),
+            google_requests.Request(session=_session),
             client_id,
         )
     except ValueError as exc:
+        logger.warning("auth_google: invalid token — %s", type(exc).__name__)
         abort(401, description=f"invalid Google token: {exc}")
+    except Exception as exc:
+        logger.exception("auth_google: token verification failed (%s)", type(exc).__name__)
+        abort(502, description="could not verify Google token — please try again")
 
     google_id = id_info["sub"]
     email = id_info.get("email", "")
     name = id_info.get("name") or email
     picture = id_info.get("picture")
 
-    user = User.query.filter_by(google_id=google_id).first()
-    if user is not None and user.is_deleted:
-        user.restore()
-    elif user is None:
-        user = User(google_id=google_id, email=email, name=name, picture_url=picture)
-        db.session.add(user)
-    else:
-        user.name = name
-        user.email = email
-        user.picture_url = picture
-    user.last_login_at = datetime.now(timezone.utc)
-    db.session.commit()
+    logger.info("auth_google: token valid, looking up user")
 
+    try:
+        user = User.query.filter_by(google_id=google_id).first()
+        if user is not None and user.is_deleted:
+            user.restore()
+            logger.info("auth_google: restored soft-deleted user id=%s", user.id)
+        elif user is None:
+            user = User(google_id=google_id, email=email, name=name, picture_url=picture)
+            db.session.add(user)
+            logger.info("auth_google: created new user")
+        else:
+            user.name = name
+            user.email = email
+            user.picture_url = picture
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.exception("auth_google: DB error during upsert (%s)", type(exc).__name__)
+        abort(500, description="database error during login")
+
+    logger.info("auth_google: session issued for user id=%s", user.id)
     token = make_session_jwt(user.id)
     response = jsonify(_user_payload(user))
     set_cookie(response, token)
@@ -540,6 +567,9 @@ def update_pool(slug):
         if not name:
             abort(400, description="name cannot be empty")
         pool.name = name
+
+    if "locked" in data:
+        pool.locked = bool(data["locked"])
 
     if "description" in data:
         pool.description = (data.get("description") or "").strip() or None
@@ -678,6 +708,11 @@ def join_pool(slug):
     nickname = (data.get("nickname") or "").strip()
     display_name = nickname or user.name
 
+    if pool.locked:
+        existing = PoolParticipant.active().filter_by(pool_id=pool.id, user_id=user.id).first()
+        if existing is None:
+            abort(403, description="Este bolão está bloqueado para novos participantes")
+
     banned = PoolParticipant.query.filter_by(
         pool_id=pool.id, user_id=user.id, removed_by_creator=True
     ).first()
@@ -696,6 +731,50 @@ def join_pool(slug):
 
     db.session.commit()
     return jsonify({"displayName": membership.display_name, "pool": _pool_payload(pool)})
+
+
+@api.post("/push/subscribe")
+@require_auth
+def push_subscribe():
+    user: User = g.current_user
+    data = _json()
+    endpoint = (data.get("endpoint") or "").strip()
+    keys = data.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        abort(400, description="endpoint and keys are required")
+
+    existing = PushSubscription.active().filter_by(endpoint=endpoint).first()
+    if existing is None:
+        db.session.add(
+            PushSubscription(user_id=user.id, endpoint=endpoint, p256dh=p256dh, auth=auth)
+        )
+    else:
+        existing.user_id = user.id
+        existing.p256dh = p256dh
+        existing.auth = auth
+
+    db.session.commit()
+    return jsonify({"status": "subscribed"}), 201
+
+
+@api.post("/push/unsubscribe")
+@require_auth
+def push_unsubscribe():
+    user: User = g.current_user
+    data = _json()
+    endpoint = (data.get("endpoint") or "").strip()
+    if not endpoint:
+        abort(400, description="endpoint is required")
+
+    subscription = PushSubscription.active().filter_by(
+        endpoint=endpoint, user_id=user.id
+    ).first()
+    if subscription is not None:
+        subscription.soft_delete()
+        db.session.commit()
+    return jsonify({"status": "unsubscribed"})
 
 
 @api.get("/pools/<slug>/matches")

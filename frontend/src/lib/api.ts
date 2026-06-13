@@ -140,6 +140,7 @@ export function getPredictionSetup(slug: string) {
 export type UpdatePoolPayload = {
   name?: string;
   description?: string;
+  locked?: boolean;
   prizes?: { position: number; description: string }[];
   scoring?: { exactScore?: number; outcome?: number; oneTeamGoals?: number; penaltyBonus?: number };
   awards?: {
@@ -446,5 +447,28 @@ export function adminUpdateTournamentAwards(
   return request<Tournament>(`/admin/tournaments/${tournamentId}/awards`, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+export type PushSubscriptionPayload = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
+export function subscribePush(subscription: PushSubscriptionPayload) {
+  return request<{ status: string }>("/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify(subscription),
+  });
+}
+
+export function unsubscribePush(endpoint: string) {
+  return request<{ status: string }>("/push/unsubscribe", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
   });
 }

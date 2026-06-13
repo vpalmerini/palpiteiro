@@ -25,6 +25,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { saveAwardPrediction, savePrediction, ordinalRound, type PredictionSetup } from "@/lib/api";
 import { patchPredictionInSetupCache, poolKeys, usePredictionSetup } from "@/lib/pool-queries";
 import { PredictionsPageSkeleton } from "@/components/page-skeletons";
+import { EnableNotifications } from "@/components/enable-notifications";
 import { TeamLogo, TeamName } from "@/components/team-badge";
 import type { AwardPrediction, Match, Prediction, Team } from "@/types";
 import { useAuth } from "@/contexts/auth";
@@ -274,6 +275,7 @@ export default function PredictionsPage({ params }: PageProps) {
           <Button asChild alignSelf="flex-start" colorPalette="green" rounded="lg" variant="subtle" size="sm">
             <Link href={`/pools/${slug}`}>Voltar ao ranking</Link>
           </Button>
+          {pool?.isParticipant ? <EnableNotifications /> : null}
           {pool && !pool.isParticipant ? <Text color="orange.600" fontSize="sm">Entre no bolão antes de registrar palpites.</Text> : null}
           {message ? <Text color="green.600" fontSize="sm">{message}</Text> : null}
         </Card.Body>

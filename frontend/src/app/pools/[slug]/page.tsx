@@ -158,6 +158,27 @@ export default function PoolPage({ params }: PageProps) {
     );
   }
 
+  if (pool.locked && !pool.isParticipant) {
+    return (
+      <Card.Root rounded="2xl" shadow="lg" mt={8}>
+        <Card.Body gap={4}>
+          <Alert.Root status="warning" rounded="lg">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Bolão bloqueado</Alert.Title>
+              <Alert.Description>
+                O criador bloqueou o acesso a novos participantes. Não é possível entrar neste bolão no momento.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Button asChild variant="outline" rounded="lg" alignSelf="flex-start">
+            <Link href="/">Ir para a página inicial</Link>
+          </Button>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+
   return (
     <Stack gap={6}>
       <Card.Root as="section" rounded="2xl" shadow="lg">
