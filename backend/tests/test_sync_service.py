@@ -120,7 +120,7 @@ class TestLinkExternalIds:
         with patch("app.sync_service.list_all_matches", return_value=[]):
             summary = link_external_ids()
 
-        assert summary.teams_linked == 48
+        assert summary.teams_linked == 49
         assert summary.teams_skipped == 0
 
         for short_name, ext_id in SHORT_NAME_TO_EXTERNAL_ID.items():
