@@ -72,6 +72,7 @@ Variáveis de ambiente relevantes (ver `backend/.env.example`):
 | `FRONTEND_ORIGIN` | Origem permitida no CORS (padrão: `http://localhost:3000`) |
 | `GOOGLE_CLIENT_ID` | Client ID do Google OAuth |
 | `JWT_SECRET` | Segredo para assinar cookies de sessão |
+| `FOOTBALL_DATA_API_KEY` | Chave da API [football-data.org](https://www.football-data.org/) — necessária para sincronização automática de placares |
 
 ### Frontend
 
@@ -88,6 +89,36 @@ Variáveis de ambiente relevantes (ver `frontend/.env.local.example`):
 |----------|-----------|
 | `FLASK_API_URL` | URL do backend usada pelo proxy Next.js (padrão: `http://localhost:5001`) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client ID do Google OAuth (exposto ao browser) |
+
+## Sincronização automática de placares
+
+Os placares das partidas são sincronizados automaticamente via [football-data.org](https://www.football-data.org/) v4.
+
+### Configuração inicial (one-shot)
+
+Após aplicar as migrations em produção, execute **uma vez** para vincular os times e partidas com seus IDs externos:
+
+```bash
+flask --app run link-external-ids
+```
+
+Isso preenche `Team.external_id` e `Match.external_id` sem chamar nada de manual. O comando é idempotente — pode ser re-executado sem efeito colateral.
+
+### Cron de sincronização
+
+O comando `sync-results` roda de hora em hora no Railway:
+
+```bash
+flask --app run sync-results
+```
+
+O fluxo a cada execução:
+1. Busca partidas não-finalizadas que começaram há ≥2h (janela de lookback de 24h).
+2. Se não houver candidatas, encerra sem chamar a API.
+3. Consulta a API para o período e aplica o placar das partidas com `status: FINISHED`.
+4. Recalcula pontuações de todos os pools automaticamente.
+
+Partidas de mata-mata cujos times ainda não estão definidos são ignoradas e vinculadas nas execuções seguintes.
 
 ## Migrations (Alembic)
 

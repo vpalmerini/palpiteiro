@@ -30,6 +30,8 @@ class Config:
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-secret-change-in-prod")
+    FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
+    FOOTBALL_DATA_BASE_URL = os.getenv("FOOTBALL_DATA_BASE_URL", "https://api.football-data.org/v4")
     JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "").lower() in {
         "1",
         "true",
