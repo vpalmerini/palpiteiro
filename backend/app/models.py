@@ -66,6 +66,7 @@ class Tournament(TimestampSoftDeleteMixin, db.Model):
     year = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(24), nullable=False, default=TournamentStatus.ONGOING.value)
     starts_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    external_competition_code = db.Column(db.String(16), nullable=True)
     champion_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     runner_up_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     third_place_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
@@ -90,6 +91,7 @@ class Team(TimestampSoftDeleteMixin, db.Model):
     team_type = db.Column(db.String(16), nullable=False, default=TeamType.NATIONAL.value)
     flag_code = db.Column(db.String(2), nullable=True)
     logo_url = db.Column(db.String(500), nullable=True)
+    external_id = db.Column(db.Integer, nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_teams_name_active", "name", postgresql_where=ACTIVE_ONLY, sqlite_where=ACTIVE_ONLY),
@@ -202,6 +204,7 @@ class Match(TimestampSoftDeleteMixin, db.Model):
     away_score = db.Column(db.Integer, nullable=True)
     went_to_penalties = db.Column(db.Boolean, nullable=False, default=False)
     penalty_winner_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
+    external_id = db.Column(db.Integer, nullable=True, index=True)
 
     tournament = db.relationship("Tournament", backref="matches")
     round = db.relationship("Round", backref=db.backref("matches", passive_deletes=True))

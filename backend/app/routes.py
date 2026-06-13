@@ -1046,6 +1046,28 @@ def seed_data():
     return jsonify({"status": seed_database()})
 
 
+def apply_match_result(
+    match: Match,
+    home_score: int,
+    away_score: int,
+    penalty_winner_team_id: str | None,
+) -> None:
+    """Apply a final result to a match and recalculate pool scores.
+
+    Mutates the match object and recalculates scores for all related pools.
+    Does NOT commit the session — callers are responsible for db.session.commit().
+    """
+    went_to_penalties = match.round.stage.is_knockout and home_score == away_score
+    match.home_score = home_score
+    match.away_score = away_score
+    match.went_to_penalties = went_to_penalties
+    match.penalty_winner_team_id = penalty_winner_team_id if went_to_penalties else None
+    match.status = MatchStatus.FINISHED.value
+
+    for pool in Pool.active().filter_by(tournament_id=match.tournament_id).all():
+        _recalculate_scores(pool)
+
+
 @api.post("/admin/matches/<uuid:match_id>/result")
 @require_admin
 def update_match_result(match_id):
@@ -1058,14 +1080,7 @@ def update_match_result(match_id):
     if went_to_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
         abort(400, description="penalty winner is required for knockout draws")
 
-    match.home_score = home_score
-    match.away_score = away_score
-    match.went_to_penalties = went_to_penalties
-    match.penalty_winner_team_id = penalty_winner_team_id if went_to_penalties else None
-    match.status = MatchStatus.FINISHED.value
-
-    for pool in Pool.active().filter_by(tournament_id=match.tournament_id).all():
-        _recalculate_scores(pool)
+    apply_match_result(match, home_score, away_score, penalty_winner_team_id)
 
     db.session.commit()
     return jsonify(_match_payload(match))
@@ -1611,13 +1626,7 @@ def update_match(match_id):
         penalty_winner_team_id = _parse_optional_id(data.get("penaltyWinnerTeamId"))
         if went_to_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
             abort(400, description="penalty winner is required for knockout draws")
-        match.home_score = home_score
-        match.away_score = away_score
-        match.went_to_penalties = went_to_penalties
-        match.penalty_winner_team_id = penalty_winner_team_id if went_to_penalties else None
-        match.status = MatchStatus.FINISHED.value
-        for pool in Pool.active().filter_by(tournament_id=match.tournament_id).all():
-            _recalculate_scores(pool)
+        apply_match_result(match, home_score, away_score, penalty_winner_team_id)
 
     db.session.commit()
     return jsonify(_match_payload(match))

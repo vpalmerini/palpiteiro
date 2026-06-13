@@ -59,4 +59,40 @@ def create_app(config_object=Config):
 
         print(seed_database())
 
+    @app.cli.command("link-external-ids")
+    def link_external_ids_cmd():
+        """One-shot: populate Team.external_id and Match.external_id from football-data.org.
+
+        Idempotent — safe to re-run; only fills NULL values.
+        Run once after applying the external-ids migration in production.
+        """
+        from .sync_service import link_external_ids
+
+        summary = link_external_ids()
+        print(f"link-external-ids done: {summary}")
+
+    @app.cli.command("sync-results")
+    def sync_results_cmd():
+        """Hourly cron: sync match results from football-data.org.
+
+        Checks tournaments with an external_competition_code set and applies
+        scores for matches that started >=2h ago and are not yet finished.
+        """
+        from .models import Tournament
+        from .sync_service import sync_tournament_results
+
+        tournaments = (
+            Tournament.active()
+            .filter(Tournament.external_competition_code.isnot(None))
+            .all()
+        )
+        if not tournaments:
+            print("sync-results: no tournaments with external_competition_code configured")
+            return
+
+        for tournament in tournaments:
+            print(f"sync-results: processing tournament '{tournament.name}'")
+            summary = sync_tournament_results(tournament)
+            print(f"sync-results: {summary}")
+
     return app
