@@ -323,11 +323,13 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
         creator = User.query.filter_by(email="victor@example.com").one()
         creator.is_admin = True
         db.session.commit()
+        _set_auth(client, creator)
 
-        client.post(
+        result_response = client.post(
             f"/api/admin/matches/{group_match['id']}/result",
             json={"homeScore": 2, "awayScore": 1},
         )
+        assert result_response.status_code == 200
 
         score_updated_at = (
             db.session.query(ScoreEntry.updated_at)
