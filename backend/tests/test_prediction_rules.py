@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from app import create_app
 from app.auth import COOKIE_NAME, make_session_jwt
 from app.extensions import db
@@ -307,18 +309,25 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
         detail_before = client.get(f"/api/pools/{slug}/detail").get_json()
         assert detail_before["rankingUpdatedAt"] is None
 
-        group_match = next(
+        upcoming_match = next(
             match for match in client.get(f"/api/pools/{slug}/matches").get_json()
-            if not match["stage"]["isKnockout"] and match["homeTeam"] is not None
+            if not match["stage"]["isKnockout"]
+            and match["homeTeam"] is not None
+            and match["status"] != MatchStatus.FINISHED.value
         )
-        client.post(
+        match_obj = Match.query.filter_by(id=upcoming_match["id"]).one()
+        match_obj.starts_at = datetime.now(timezone.utc) + timedelta(hours=2)
+        db.session.commit()
+
+        pred_response = client.post(
             f"/api/pools/{slug}/predictions",
             json={
-                "matchId": group_match["id"],
+                "matchId": upcoming_match["id"],
                 "homeScore": 2,
                 "awayScore": 1,
             },
         )
+        assert pred_response.status_code == 200
 
         pool_obj = Pool.query.filter_by(slug=slug).one()
         creator = pool_obj.creator
@@ -328,7 +337,7 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
         _set_auth(client, creator)
 
         result_response = client.post(
-            f"/api/admin/matches/{group_match['id']}/result",
+            f"/api/admin/matches/{upcoming_match['id']}/result",
             json={"homeScore": 2, "awayScore": 1},
         )
         assert result_response.status_code == 200
@@ -338,7 +347,7 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
             .join(Prediction, ScoreEntry.prediction_id == Prediction.id)
             .filter(
                 Prediction.pool_id == pool_obj.id,
-                Prediction.match_id == group_match["id"],
+                Prediction.match_id == upcoming_match["id"],
             )
             .scalar()
         )
