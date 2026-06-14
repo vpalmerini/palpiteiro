@@ -116,6 +116,7 @@ export type PoolDetail = {
   pool: Pool;
   matches: Match[];
   ranking: RankingEntry[];
+  rankingUpdatedAt: string | null;
   snapshots: RoundSnapshot[];
   predictedMatchIds: string[];
   removedParticipants: RemovedParticipant[];

@@ -689,10 +689,13 @@ def get_pool_detail(slug):
 
     db.session.commit()
 
+    ranking_updated_at = _pool_ranking_updated_at(pool)
+
     return jsonify({
         "pool": _pool_payload(pool, is_participant=is_participant, is_removed=is_removed),
         "matches": _list_pool_matches_payload(pool),
         "ranking": [{k: v for k, v in e.items()} for e in ranking],
+        "rankingUpdatedAt": ranking_updated_at.isoformat() if ranking_updated_at else None,
         "snapshots": _list_pool_snapshots_payload(pool),
         "predictedMatchIds": predicted_match_ids,
         "removedParticipants": removed_participants,
@@ -985,6 +988,37 @@ def get_ranking(slug):
     entries = _build_ranking(pool, recalculate=False)
     db.session.commit()
     return jsonify([{k: v for k, v in e.items()} for e in entries])
+
+
+def _pool_ranking_updated_at(pool: Pool) -> datetime | None:
+    """Return when ranking points last changed for this pool, if known."""
+    score_updated = (
+        db.session.query(func.max(ScoreEntry.updated_at))
+        .join(Prediction, ScoreEntry.prediction_id == Prediction.id)
+        .filter(
+            Prediction.pool_id == pool.id,
+            Prediction.deleted_at.is_(None),
+            ScoreEntry.deleted_at.is_(None),
+        )
+        .scalar()
+    )
+
+    candidates: list[datetime] = [score_updated] if score_updated is not None else []
+
+    tournament = pool.tournament
+    has_award_results = (
+        (pool.predict_champion and tournament.champion_team_id)
+        or (pool.predict_runner_up and tournament.runner_up_team_id)
+        or (pool.predict_third_place and tournament.third_place_team_id)
+        or (pool.predict_top_scorer and tournament.top_scorer)
+        or (pool.predict_best_player and tournament.best_player)
+    )
+    if has_award_results:
+        candidates.append(tournament.updated_at)
+
+    if not candidates:
+        return None
+    return max(candidates)
 
 
 def _build_ranking(pool: Pool, *, recalculate: bool = False) -> list[dict]:

@@ -1,7 +1,7 @@
 from app import create_app
 from app.auth import COOKIE_NAME, make_session_jwt
 from app.extensions import db
-from app.models import Match, Round, Stage, StageType, Team, Tournament, User
+from app.models import Match, MatchStatus, Prediction, Round, ScoreEntry, Stage, StageType, Team, Tournament, User
 
 
 class TestConfig:
@@ -293,3 +293,49 @@ def test_knockout_non_draw_ignores_penalty_winner():
         assert response.status_code == 200
         assert response.get_json()["predictsPenalties"] is False
         assert response.get_json()["penaltyWinnerTeamId"] is None
+
+
+def test_pool_detail_ranking_updated_at_is_null_without_scores():
+    for client, slug in _client_with_pool():
+        detail = client.get(f"/api/pools/{slug}/detail").get_json()
+
+        assert detail["rankingUpdatedAt"] is None
+
+
+def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
+    for client, slug in _client_with_pool():
+        detail_before = client.get(f"/api/pools/{slug}/detail").get_json()
+        assert detail_before["rankingUpdatedAt"] is None
+
+        group_match = next(
+            match for match in client.get(f"/api/pools/{slug}/matches").get_json()
+            if not match["stage"]["isKnockout"] and match["homeTeam"] is not None
+        )
+        client.post(
+            f"/api/pools/{slug}/predictions",
+            json={
+                "matchId": group_match["id"],
+                "homeScore": 2,
+                "awayScore": 1,
+            },
+        )
+
+        creator = User.query.filter_by(email="victor@example.com").one()
+        creator.is_admin = True
+        db.session.commit()
+
+        client.post(
+            f"/api/admin/matches/{group_match['id']}/result",
+            json={"homeScore": 2, "awayScore": 1},
+        )
+
+        score_updated_at = (
+            db.session.query(ScoreEntry.updated_at)
+            .join(Prediction, ScoreEntry.prediction_id == Prediction.id)
+            .filter(Prediction.match_id == group_match["id"])
+            .scalar()
+        )
+        assert score_updated_at is not None
+
+        detail_after = client.get(f"/api/pools/{slug}/detail").get_json()
+        assert detail_after["rankingUpdatedAt"] == score_updated_at.isoformat()
