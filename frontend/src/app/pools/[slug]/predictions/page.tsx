@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { saveAwardPrediction, savePrediction, ordinalRound, type PredictionSetup } from "@/lib/api";
@@ -93,6 +93,24 @@ export default function PredictionsPage({ params }: PageProps) {
     if (!effectiveDate) return matches;
     return matches.filter((m) => matchLocalDate(m) === effectiveDate);
   }, [matches, effectiveDate]);
+
+  // Derived from data directly (not from predictions state) to avoid useLayoutEffect timing issues
+  const predictedMatchIds = useMemo(
+    () => new Set((data?.predictions ?? []).map((p) => p.matchId)),
+    [data],
+  );
+  const pendingInDate = useMemo(
+    () => filteredMatches.filter((m) => !predictedMatchIds.has(m.id) && !m.isLocked),
+    [filteredMatches, predictedMatchIds],
+  );
+  const defaultTabValue = pendingInDate.length > 0 ? "pending" : "all";
+
+  const dateFilterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dateFilterRef.current) return;
+    const activeBtn = dateFilterRef.current.querySelector('[data-active="true"]');
+    activeBtn?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [effectiveDate]);
 
   useEffect(() => {
     Promise.resolve(params).then(({ slug: routeSlug }) => setSlug(routeSlug));
@@ -398,13 +416,14 @@ export default function PredictionsPage({ params }: PageProps) {
       ) : null}
 
       {availableDates.length > 1 && (
-        <HStack gap={2} overflowX="auto" pb={3} flexWrap="nowrap">
+        <HStack ref={dateFilterRef} gap={2} overflowX="auto" pb={3} flexWrap="nowrap">
           <Button
             size="sm"
             rounded="md"
             flexShrink={0}
             variant={effectiveDate === null ? "solid" : "outline"}
             colorPalette="gray"
+            data-active={String(effectiveDate === null)}
             {...(effectiveDate === null && { bg: "gray.600", color: "white" })}
             onClick={() => setSelectedDate(null)}
           >
@@ -423,6 +442,7 @@ export default function PredictionsPage({ params }: PageProps) {
                 flexShrink={0}
                 variant={isActive ? "solid" : "outline"}
                 colorPalette="gray"
+                data-active={String(isActive)}
                 {...(isActive && { bg: "gray.600", color: "white" })}
                 onClick={() => setSelectedDate(date)}
               >
@@ -484,7 +504,7 @@ export default function PredictionsPage({ params }: PageProps) {
           );
         }
 
-        function renderRoundContent(rs: RoundSection, openFirstGroup = false) {
+        function renderRoundContent(rs: RoundSection, expandAll: boolean) {
           // Group matches by group within the round
           type GroupBucket = { groupKey: string; groupName: string | null; matches: Match[] };
           const buckets = new Map<string, GroupBucket>();
@@ -508,9 +528,9 @@ export default function PredictionsPage({ params }: PageProps) {
 
           return (
             <Stack gap={3} pt={2}>
-              {sorted.map((bucket, groupIndex) =>
+              {sorted.map((bucket) =>
                 bucket.groupName ? (
-                  <Collapsible.Root key={bucket.groupKey} defaultOpen={openFirstGroup && groupIndex === 0}>
+                  <Collapsible.Root key={bucket.groupKey} defaultOpen={expandAll}>
                     <Collapsible.Trigger asChild>
                       <HStack
                         gap={2}
@@ -549,9 +569,9 @@ export default function PredictionsPage({ params }: PageProps) {
           );
         }
 
-        function renderStageSections(map: Map<string, StageSection>) {
+        function renderStageSections(map: Map<string, StageSection>, expandAll: boolean) {
           return [...map.values()].map((section, sectionIndex) => (
-            <Collapsible.Root key={section.stageId} defaultOpen={sectionIndex === 0}>
+            <Collapsible.Root key={section.stageId} defaultOpen={expandAll || sectionIndex === 0}>
               <Collapsible.Trigger asChild>
                 <HStack
                   gap={3}
@@ -582,12 +602,12 @@ export default function PredictionsPage({ params }: PageProps) {
               <Collapsible.Content>
                 <Stack gap={4} pt={2}>
                   {section.rounds.map((rs, roundIndex) => {
-                    const openFirstGroup = sectionIndex === 0 && roundIndex === 0;
+                    const openFirst = sectionIndex === 0 && roundIndex === 0;
                     return section.stageType === "knockout" ? (
                       // Knockout: no round label, groups still collapsible if present
-                      <Box key={rs.roundId}>{renderRoundContent(rs, openFirstGroup)}</Box>
+                      <Box key={rs.roundId}>{renderRoundContent(rs, expandAll || openFirst)}</Box>
                     ) : (
-                      <Collapsible.Root key={rs.roundId} defaultOpen={openFirstGroup}>
+                      <Collapsible.Root key={rs.roundId} defaultOpen={expandAll || openFirst}>
                         <Collapsible.Trigger asChild>
                           <HStack
                             gap={2}
@@ -615,7 +635,7 @@ export default function PredictionsPage({ params }: PageProps) {
                           </HStack>
                         </Collapsible.Trigger>
                         <Collapsible.Content>
-                          {renderRoundContent(rs, openFirstGroup)}
+                          {renderRoundContent(rs, expandAll || openFirst)}
                         </Collapsible.Content>
                       </Collapsible.Root>
                     );
@@ -625,6 +645,8 @@ export default function PredictionsPage({ params }: PageProps) {
             </Collapsible.Root>
           ));
         }
+
+        const expandAll = effectiveDate !== null;
 
         const pending = filteredMatches.filter((m) => !predictions[m.id] && !m.isLocked);
         const predicted = filteredMatches.filter((m) => !!predictions[m.id]);
@@ -900,7 +922,7 @@ export default function PredictionsPage({ params }: PageProps) {
         }
 
         return (
-          <Tabs.Root defaultValue="pending" variant="enclosed" size="sm">
+          <Tabs.Root key={effectiveDate ?? "all"} defaultValue={defaultTabValue} variant="enclosed" size="sm">
             <Tabs.List>
               {/* Mobile: icon + count only. Desktop: icon + label + count */}
               <Tabs.Trigger value="all" flex={{ base: 1, sm: "initial" }}>
@@ -936,24 +958,24 @@ export default function PredictionsPage({ params }: PageProps) {
             </Tabs.List>
 
             <Tabs.Content value="all" pt={4}>
-              <Stack gap={8}>{renderStageSections(stageMap)}</Stack>
+              <Stack gap={8}>{renderStageSections(stageMap, expandAll)}</Stack>
             </Tabs.Content>
 
             <Tabs.Content value="pending" pt={4}>
               {pending.length === 0
                 ? <Text color="fg.muted" fontSize="sm">Nenhum jogo pendente.</Text>
-                : <Stack gap={8}>{renderStageSections(buildStageMap(pending))}</Stack>}
+                : <Stack gap={8}>{renderStageSections(buildStageMap(pending), expandAll)}</Stack>}
             </Tabs.Content>
 
             <Tabs.Content value="predicted" pt={4}>
               {predicted.length === 0
                 ? <Text color="fg.muted" fontSize="sm">Nenhum palpite registrado ainda.</Text>
-                : <Stack gap={8}>{renderStageSections(buildStageMap(predicted))}</Stack>}
+                : <Stack gap={8}>{renderStageSections(buildStageMap(predicted), expandAll)}</Stack>}
             </Tabs.Content>
 
             {missed.length > 0 && (
               <Tabs.Content value="missed" pt={4}>
-                <Stack gap={8}>{renderStageSections(buildStageMap(missed))}</Stack>
+                <Stack gap={8}>{renderStageSections(buildStageMap(missed), expandAll)}</Stack>
               </Tabs.Content>
             )}
           </Tabs.Root>
