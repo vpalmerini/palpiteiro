@@ -33,6 +33,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { joinPool, ordinalRound } from "@/lib/api";
+import { formatDateTime } from "@/lib/datetime";
 import { poolKeys, usePoolDetail, usePrefetchPredictionSetup } from "@/lib/pool-queries";
 import { PoolDetailPageSkeleton } from "@/components/page-skeletons";
 import { TeamLogo, TeamName } from "@/components/team-badge";
@@ -54,6 +55,7 @@ export default function PoolPage({ params }: PageProps) {
   const pool = data?.pool ?? null;
   const matches = data?.matches ?? [];
   const ranking = data?.ranking ?? [];
+  const rankingUpdatedAt = data?.rankingUpdatedAt ?? null;
   const snapshots = data?.snapshots ?? [];
   const predictedMatchIds = useMemo(
     () => new Set(data?.predictedMatchIds ?? []),
@@ -367,7 +369,17 @@ export default function PoolPage({ params }: PageProps) {
 
       <Card.Root as="section" rounded="2xl">
         <Card.Body gap={4}>
-          <Card.Title>Ranking</Card.Title>
+          <HStack justify="space-between" align="baseline" flexWrap="wrap" gap={2}>
+            <Card.Title>Ranking</Card.Title>
+            <HStack gap={1.5} color="fg.muted">
+              <Clock size={14} aria-hidden />
+              <Text fontSize="xs">
+                {rankingUpdatedAt
+                  ? `Atualizado em ${formatDateTime(rankingUpdatedAt)}`
+                  : "Aguardando resultados para atualizar o ranking"}
+              </Text>
+            </HStack>
+          </HStack>
           <Table.ScrollArea>
             <Table.Root>
               <Table.Header>

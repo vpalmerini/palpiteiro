@@ -1,7 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 from app import create_app
 from app.auth import COOKIE_NAME, make_session_jwt
 from app.extensions import db
-from app.models import Match, Round, Stage, StageType, Team, Tournament, User
+from app.models import Match, MatchStatus, Pool, Prediction, Round, ScoreEntry, Stage, StageType, Team, Tournament, User
 
 
 class TestConfig:
@@ -293,3 +295,63 @@ def test_knockout_non_draw_ignores_penalty_winner():
         assert response.status_code == 200
         assert response.get_json()["predictsPenalties"] is False
         assert response.get_json()["penaltyWinnerTeamId"] is None
+
+
+def test_pool_detail_ranking_updated_at_is_null_without_scores():
+    for client, slug in _client_with_pool():
+        detail = client.get(f"/api/pools/{slug}/detail").get_json()
+
+        assert detail["rankingUpdatedAt"] is None
+
+
+def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
+    for client, slug in _client_with_pool():
+        detail_before = client.get(f"/api/pools/{slug}/detail").get_json()
+        assert detail_before["rankingUpdatedAt"] is None
+
+        upcoming_match = next(
+            match for match in client.get(f"/api/pools/{slug}/matches").get_json()
+            if not match["stage"]["isKnockout"]
+            and match["homeTeam"] is not None
+            and match["status"] != MatchStatus.FINISHED.value
+        )
+        match_obj = Match.query.filter_by(id=upcoming_match["id"]).one()
+        match_obj.starts_at = datetime.now(timezone.utc) + timedelta(hours=2)
+        db.session.commit()
+
+        pred_response = client.post(
+            f"/api/pools/{slug}/predictions",
+            json={
+                "matchId": upcoming_match["id"],
+                "homeScore": 2,
+                "awayScore": 1,
+            },
+        )
+        assert pred_response.status_code == 200
+
+        pool_obj = Pool.query.filter_by(slug=slug).one()
+        creator = pool_obj.creator
+        assert creator is not None
+        creator.is_admin = True
+        db.session.commit()
+        _set_auth(client, creator)
+
+        result_response = client.post(
+            f"/api/admin/matches/{upcoming_match['id']}/result",
+            json={"homeScore": 2, "awayScore": 1},
+        )
+        assert result_response.status_code == 200
+
+        score_updated_at = (
+            db.session.query(ScoreEntry.updated_at)
+            .join(Prediction, ScoreEntry.prediction_id == Prediction.id)
+            .filter(
+                Prediction.pool_id == pool_obj.id,
+                Prediction.match_id == upcoming_match["id"],
+            )
+            .scalar()
+        )
+        assert score_updated_at is not None
+
+        detail_after = client.get(f"/api/pools/{slug}/detail").get_json()
+        assert detail_after["rankingUpdatedAt"] == score_updated_at.isoformat()
