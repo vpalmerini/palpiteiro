@@ -1,7 +1,7 @@
 from app import create_app
 from app.auth import COOKIE_NAME, make_session_jwt
 from app.extensions import db
-from app.models import Match, MatchStatus, Prediction, Round, ScoreEntry, Stage, StageType, Team, Tournament, User
+from app.models import Match, MatchStatus, Pool, Prediction, Round, ScoreEntry, Stage, StageType, Team, Tournament, User
 
 
 class TestConfig:
@@ -320,7 +320,9 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
             },
         )
 
-        creator = User.query.filter_by(email="victor@example.com").one()
+        pool_obj = Pool.query.filter_by(slug=slug).one()
+        creator = pool_obj.creator
+        assert creator is not None
         creator.is_admin = True
         db.session.commit()
         _set_auth(client, creator)
@@ -334,7 +336,10 @@ def test_pool_detail_ranking_updated_at_reflects_latest_score_entry():
         score_updated_at = (
             db.session.query(ScoreEntry.updated_at)
             .join(Prediction, ScoreEntry.prediction_id == Prediction.id)
-            .filter(Prediction.match_id == group_match["id"])
+            .filter(
+                Prediction.pool_id == pool_obj.id,
+                Prediction.match_id == group_match["id"],
+            )
             .scalar()
         )
         assert score_updated_at is not None
