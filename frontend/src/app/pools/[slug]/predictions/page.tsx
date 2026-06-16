@@ -685,14 +685,15 @@ export default function PredictionsPage({ params }: PageProps) {
           const isDirty = prediction !== undefined && draft !== undefined && isLocalDraftDirty(draft, prediction);
           const isUnsavedDraft = !prediction && draft !== undefined && isLocalDraftDirty(draft, undefined);
           const isPendingSave = isDirty || isUnsavedDraft;
+          const isEmptyPick = !prediction && !isPendingSave;
 
           return (
             <Card.Root
               as="section"
               key={match.id}
               rounded="2xl"
-              borderWidth={prediction || isPendingSave ? "2px" : "1px"}
-              borderColor={isPendingSave ? "orange.300" : prediction ? "green.300" : undefined}
+              borderWidth="2px"
+              borderColor={isPendingSave ? "orange.300" : prediction ? "green.300" : isEmptyPick ? "gray.200" : undefined}
             >
               <Card.Body gap={3} p={{ base: 3, md: 4 }}>
                 <Stack gap={2}>
