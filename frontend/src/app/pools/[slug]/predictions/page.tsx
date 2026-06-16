@@ -43,13 +43,35 @@ type AwardDraft = {
   bestPlayer: string;
 };
 
+type ScoreDraft = { homeScore: string; awayScore: string; penaltyWinnerId: string };
+
+function predictionToDraft(prediction: Prediction): ScoreDraft {
+  return {
+    homeScore: String(prediction.homeScore),
+    awayScore: String(prediction.awayScore),
+    penaltyWinnerId: prediction.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "",
+  };
+}
+
+function isLocalDraftDirty(draft: ScoreDraft, saved: Prediction | undefined): boolean {
+  if (!saved) {
+    return draft.homeScore !== "" || draft.awayScore !== "" || draft.penaltyWinnerId !== "";
+  }
+  const savedDraft = predictionToDraft(saved);
+  return (
+    draft.homeScore !== savedDraft.homeScore ||
+    draft.awayScore !== savedDraft.awayScore ||
+    draft.penaltyWinnerId !== savedDraft.penaltyWinnerId
+  );
+}
+
 export default function PredictionsPage({ params }: PageProps) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [slug, setSlug] = useState("");
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-  const [scoreDrafts, setScoreDrafts] = useState<Record<string, { homeScore: string; awayScore: string; penaltyWinnerId: string }>>({});
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, ScoreDraft>>({});
   const [savedAwardPrediction, setSavedAwardPrediction] = useState<AwardPrediction | null>(null);
   const [awardDraft, setAwardDraft] = useState<AwardDraft>({ championTeamId: "", runnerUpTeamId: "", thirdPlaceTeamId: "", topScorer: "", bestPlayer: "" });
   const [awardLocked, setAwardLocked] = useState(false);
@@ -127,19 +149,20 @@ export default function PredictionsPage({ params }: PageProps) {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPredictions(Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction])));
+    const savedByMatchId = Object.fromEntries(data.predictions.map((prediction) => [prediction.matchId, prediction]));
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setScoreDrafts(
-      Object.fromEntries(
-        data.predictions.map((prediction) => [
-          prediction.matchId,
-          {
-            homeScore: String(prediction.homeScore),
-            awayScore: String(prediction.awayScore),
-            penaltyWinnerId: prediction.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "",
-          },
-        ]),
-      ),
-    );
+    setScoreDrafts((current) => {
+      const fromServer = Object.fromEntries(
+        data.predictions.map((prediction) => [prediction.matchId, predictionToDraft(prediction)]),
+      );
+      const merged = { ...fromServer };
+      for (const [matchId, draft] of Object.entries(current)) {
+        if (isLocalDraftDirty(draft, savedByMatchId[matchId])) {
+          merged[matchId] = draft;
+        }
+      }
+      return merged;
+    });
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAwardLocked(data.awardPrediction.isLocked);
 
@@ -659,23 +682,17 @@ export default function PredictionsPage({ params }: PageProps) {
           const awayScore = draft?.awayScore ?? (prediction ? String(prediction.awayScore) : "");
           const isPredictedKnockoutDraw =
             match.stage.isKnockout && homeScore !== "" && awayScore !== "" && Number(homeScore) === Number(awayScore);
-          const savedPenaltyWinnerId = prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "";
-          const isDirty =
-            prediction !== undefined &&
-            draft !== undefined &&
-            (
-              draft.homeScore !== String(prediction.homeScore) ||
-              draft.awayScore !== String(prediction.awayScore) ||
-              (isPredictedKnockoutDraw && (draft.penaltyWinnerId ?? "") !== savedPenaltyWinnerId)
-            );
+          const isDirty = prediction !== undefined && draft !== undefined && isLocalDraftDirty(draft, prediction);
+          const isUnsavedDraft = !prediction && draft !== undefined && isLocalDraftDirty(draft, undefined);
+          const isPendingSave = isDirty || isUnsavedDraft;
 
           return (
             <Card.Root
               as="section"
               key={match.id}
               rounded="2xl"
-              borderWidth={prediction || isDirty ? "2px" : "1px"}
-              borderColor={isDirty ? "orange.300" : prediction ? "green.300" : undefined}
+              borderWidth={prediction || isPendingSave ? "2px" : "1px"}
+              borderColor={isPendingSave ? "orange.300" : prediction ? "green.300" : undefined}
             >
               <Card.Body gap={3} p={{ base: 3, md: 4 }}>
                 <Stack gap={2}>
@@ -723,9 +740,12 @@ export default function PredictionsPage({ params }: PageProps) {
                     </HStack>
                   </Stack>
                   <Stack direction="row" align="center" flexWrap="wrap" gap={2}>
-                    {isDirty ? (
+                    {isPendingSave ? (
                       <Badge colorPalette="orange" rounded="full" variant="subtle">
-                        <HStack gap={1}><AlertTriangle size={10} />Alterações não salvas</HStack>
+                        <HStack gap={1}>
+                          <AlertTriangle size={10} />
+                          {isDirty ? "Alterações não salvas" : "Palpite não salvo"}
+                        </HStack>
                       </Badge>
                     ) : prediction ? (
                       <Badge colorPalette="green" rounded="full" variant="subtle">
@@ -906,7 +926,7 @@ export default function PredictionsPage({ params }: PageProps) {
                     ) : null}
 
                     <Button
-                      colorPalette={isDirty ? "orange" : "green"}
+                      colorPalette={isPendingSave ? "orange" : "green"}
                       disabled={match.isLocked || !user}
                       rounded="lg"
                       type="submit"
