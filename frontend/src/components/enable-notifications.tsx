@@ -124,9 +124,10 @@ export function EnableNotifications() {
     }
   }, [subscription]);
 
-  if (!supported || !VAPID_PUBLIC_KEY) return null;
+  if (!VAPID_PUBLIC_KEY) return null;
 
   // On iOS, Web Push only works when the app is installed to the home screen.
+  // Show install instructions even when the browser lacks push API support (iOS < 16.4).
   if (isIOS && !isStandalone) {
     return (
       <Alert.Root status="info" rounded="lg" size="sm">
@@ -140,6 +141,8 @@ export function EnableNotifications() {
       </Alert.Root>
     );
   }
+
+  if (!supported) return null;
 
   if (permission === "denied") {
     return (
