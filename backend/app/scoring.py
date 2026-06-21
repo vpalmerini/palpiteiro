@@ -51,6 +51,9 @@ def calculate_prediction_score(prediction, match, pool) -> ScoreResult:
         if penalty_hit:
             points += pool.penalty_bonus_points
 
+    if pool.is_multiplier_enabled and prediction.has_multiplier and points > 0:
+        points *= pool.multiplier_value
+
     return ScoreResult(
         points=points,
         exact_score=exact_score,

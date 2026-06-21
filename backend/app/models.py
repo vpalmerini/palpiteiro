@@ -281,6 +281,8 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
     predict_best_player = db.Column(db.Boolean, nullable=False, default=False)
     best_player_points = db.Column(db.Integer, nullable=False, default=10)
     locked = db.Column(db.Boolean, nullable=False, default=False)
+    is_multiplier_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    multiplier_value = db.Column(db.Integer, nullable=False, default=3)
 
     tournament = db.relationship("Tournament", backref="pools")
     creator = db.relationship("User", foreign_keys=[creator_user_id], backref="created_pools")
@@ -359,6 +361,7 @@ class Prediction(TimestampSoftDeleteMixin, db.Model):
     predicted_away_score = db.Column(db.Integer, nullable=False)
     predicts_penalties = db.Column(db.Boolean, nullable=False, default=False)
     predicted_penalty_winner_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True)
+    has_multiplier = db.Column(db.Boolean, nullable=False, default=False)
 
     pool = db.relationship("Pool", backref=db.backref("predictions", passive_deletes=True))
     user = db.relationship("User", backref="predictions")

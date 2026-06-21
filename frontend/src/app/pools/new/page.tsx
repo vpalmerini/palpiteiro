@@ -13,11 +13,13 @@ import {
   Separator,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   Textarea,
 } from "@chakra-ui/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Zap } from "lucide-react";
 
 import { createPool, listTournaments, type AwardConfigPayload } from "@/lib/api";
 import { NewPoolPageSkeleton } from "@/components/page-skeletons";
@@ -68,6 +70,16 @@ const DEFAULT_AWARDS: AwardsState = {
   bestPlayer: { enabled: false, points: 10 },
 };
 
+type PalpitaoState = {
+  enabled: boolean;
+  multiplier: number;
+};
+
+const DEFAULT_PALPITAO: PalpitaoState = {
+  enabled: true,
+  multiplier: 3,
+};
+
 export default function NewPoolPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -75,6 +87,7 @@ export default function NewPoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scoring, setScoring] = useState<ScoringState>(DEFAULT_SCORING);
   const [awards, setAwards] = useState<AwardsState>(DEFAULT_AWARDS);
+  const [palpitao, setPalpitao] = useState<PalpitaoState>(DEFAULT_PALPITAO);
   const [tournaments, setTournaments] = useState<{ id: string; name: string; year: number; status: string }[]>([]);
   const [tournamentId, setTournamentId] = useState<string | null>(null);
 
@@ -119,6 +132,7 @@ export default function NewPoolPage() {
         })),
         scoring,
         awards,
+        palpitao,
       });
       router.push(`/pools/${pool.slug}`);
     } catch (caught) {
@@ -257,6 +271,53 @@ export default function NewPoolPage() {
                   </HStack>
                 </HStack>
               ))}
+            </Stack>
+
+            <Separator />
+
+            <Stack gap={3}>
+              <HStack gap={2} align="center">
+                <Zap size={16} color="var(--chakra-colors-yellow-600)" />
+                <Heading size="sm">Palpitão</Heading>
+              </HStack>
+              <Text color="fg.muted" fontSize="sm">
+                Cada participante pode usar o Palpitão <Text as="strong">1 única vez</Text> em todo o torneio para multiplicar os pontos de um jogo à sua escolha.
+              </Text>
+              <HStack gap={4} justify="space-between" align="center">
+                <Stack gap={1} flex="1">
+                  <Text fontSize="sm" fontWeight="medium">Habilitar Palpitão</Text>
+                  <Text fontSize="xs" color="fg.muted">1 uso por participante em todo o torneio</Text>
+                </Stack>
+                <Switch.Root
+                  checked={palpitao.enabled}
+                  onCheckedChange={(d) => setPalpitao((prev) => ({ ...prev, enabled: d.checked }))}
+                  colorPalette="yellow"
+                >
+                  <Switch.HiddenInput />
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch.Root>
+              </HStack>
+              <HStack gap={4} align="center" opacity={palpitao.enabled ? 1 : 0.4}>
+                <Stack flex="1" gap={0}>
+                  <Text fontSize="sm" fontWeight="medium">Multiplicador</Text>
+                  <Text fontSize="xs" color="fg.muted">Valor entre ×2 e ×10</Text>
+                </Stack>
+                <HStack gap={2} align="center">
+                  <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">×</Text>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={10}
+                    w="20"
+                    size="sm"
+                    value={palpitao.multiplier}
+                    disabled={!palpitao.enabled}
+                    onChange={(e) => setPalpitao((prev) => ({ ...prev, multiplier: Math.max(2, Math.min(10, Number(e.target.value))) }))}
+                  />
+                </HStack>
+              </HStack>
             </Stack>
 
             {error ? <Text color="red.600">{error}</Text> : null}
