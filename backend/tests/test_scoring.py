@@ -11,6 +11,8 @@ class PoolStub:
     outcome_points: int = 3
     one_team_goals_points: int = 1
     penalty_bonus_points: int = 2
+    is_multiplier_enabled: bool = False
+    multiplier_value: int = 3
 
 
 @dataclass
@@ -27,6 +29,7 @@ class PredictionStub:
     predicted_away_score: int
     predicts_penalties: bool = False
     predicted_penalty_winner_team_id: str | None = None
+    has_multiplier: bool = False
 
 
 def test_exact_score_gets_full_points():
