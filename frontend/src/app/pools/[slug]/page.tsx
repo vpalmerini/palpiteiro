@@ -27,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardList, Clock, Copy, Link2, LineChart as LineChartIcon, Lock, LogIn, Medal, Settings, Share2, Trophy, UserPlus, Users, Zap } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -347,6 +347,21 @@ export default function PoolPage({ params }: PageProps) {
             </>
           )}
 
+          {pool.palpitao?.enabled && (
+            <>
+              <Separator />
+              <Stack gap={1}>
+                <HStack gap={2} align="center">
+                  <Zap size={14} color="var(--chakra-colors-yellow-600)" />
+                  <Text fontSize="sm" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wide">Palpitão</Text>
+                </HStack>
+                <Text fontSize="sm" color="fg.muted" mt={1}>
+                  Cada participante pode escolher 1 jogo para multiplicar seus pontos por ×{pool.palpitao.multiplier}. O Palpitão é único por torneio.
+                </Text>
+              </Stack>
+            </>
+          )}
+
           <Separator />
 
           <Stack gap={1}>
@@ -390,6 +405,11 @@ export default function PoolPage({ params }: PageProps) {
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 1">Placares exatos</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 2">Resultados</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 3">Pts. mata-mata</Table.ColumnHeader>
+                  {pool.palpitao?.enabled && (
+                    <Table.ColumnHeader textAlign="center" title={`Palpitão ×${pool.palpitao.multiplier}`} w="12">
+                      <Zap size={14} />
+                    </Table.ColumnHeader>
+                  )}
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -412,6 +432,15 @@ export default function PoolPage({ params }: PageProps) {
                     <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
                     <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
                     <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
+                    {pool.palpitao?.enabled && (
+                      <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão usado" : "Palpitão disponível"}>
+                        <Zap
+                          size={14}
+                          color={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "var(--chakra-colors-gray-300)"}
+                          fill={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "none"}
+                        />
+                      </Table.Cell>
+                    )}
                   </Table.Row>
                 ))}
               </Table.Body>

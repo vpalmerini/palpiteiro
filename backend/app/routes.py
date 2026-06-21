@@ -264,6 +264,10 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
             "topScorer": {"enabled": pool.predict_top_scorer, "points": pool.top_scorer_points},
             "bestPlayer": {"enabled": pool.predict_best_player, "points": pool.best_player_points},
         },
+        "palpitao": {
+            "enabled": pool.is_multiplier_enabled,
+            "multiplier": pool.multiplier_value,
+        },
     }
 
 
@@ -287,6 +291,7 @@ def _prediction_payload(
         "awayScore": prediction.predicted_away_score,
         "predictsPenalties": prediction.predicts_penalties,
         "penaltyWinnerTeamId": prediction.predicted_penalty_winner_team_id,
+        "hasMultiplier": prediction.has_multiplier,
         "updatedAt": prediction.updated_at.isoformat(),
         "score": {
             "points": score.points,
@@ -490,6 +495,7 @@ def create_pool():
 
     scoring = data.get("scoring") or {}
     awards_cfg = data.get("awards") or {}
+    palpitao_cfg = data.get("palpitao") or {}
     creator_nickname = (data.get("creatorNickname") or "").strip()
     creator_display_name = creator_nickname or user.name
 
@@ -502,6 +508,9 @@ def create_pool():
     third_place_enabled, third_place_pts = _award_cfg("thirdPlace", True, 7)
     top_scorer_enabled, top_scorer_pts = _award_cfg("topScorer", False, 10)
     best_player_enabled, best_player_pts = _award_cfg("bestPlayer", False, 10)
+
+    palpitao_enabled = bool(palpitao_cfg.get("enabled", True))
+    palpitao_multiplier = max(2, min(10, int(palpitao_cfg.get("multiplier", 3))))
 
     pool = Pool(
         slug=slug,
@@ -524,6 +533,8 @@ def create_pool():
         top_scorer_points=top_scorer_pts,
         predict_best_player=best_player_enabled,
         best_player_points=best_player_pts,
+        is_multiplier_enabled=palpitao_enabled,
+        multiplier_value=palpitao_multiplier,
     )
     db.session.add(pool)
     db.session.flush()
@@ -559,8 +570,8 @@ def update_pool(slug):
         or AwardPrediction.active().filter_by(pool_id=pool.id).first() is not None
     )
 
-    if ("scoring" in data or "awards" in data) and has_predictions:
-        abort(409, description="cannot change scoring or awards after predictions have been made")
+    if ("scoring" in data or "awards" in data or "palpitao" in data) and has_predictions:
+        abort(409, description="cannot change scoring, awards or palpitão after predictions have been made")
 
     if "name" in data:
         name = (data.get("name") or "").strip()
@@ -614,6 +625,13 @@ def update_pool(slug):
         _apply_award("predict_third_place", "third_place_points", "thirdPlace")
         _apply_award("predict_top_scorer", "top_scorer_points", "topScorer")
         _apply_award("predict_best_player", "best_player_points", "bestPlayer")
+
+    if "palpitao" in data:
+        palpitao = data.get("palpitao") or {}
+        if "enabled" in palpitao:
+            pool.is_multiplier_enabled = bool(palpitao["enabled"])
+        if "multiplier" in palpitao:
+            pool.multiplier_value = max(2, min(10, int(palpitao["multiplier"])))
 
     db.session.commit()
     return jsonify(_pool_payload(pool))
@@ -907,7 +925,13 @@ def upsert_prediction(slug):
     if predicts_penalties and penalty_winner_team_id not in [match.home_team_id, match.away_team_id]:
         abort(400, description="penalty winner is required for knockout draws")
 
+    has_multiplier_requested = bool(data.get("hasMultiplier", False))
+    if has_multiplier_requested and not pool.is_multiplier_enabled:
+        abort(400, description="palpitão não está habilitado neste bolão")
+
     prediction = Prediction.active().filter_by(pool_id=pool.id, user_id=user.id, match_id=match.id).first()
+    old_has_multiplier = prediction.has_multiplier if prediction is not None else False
+
     if prediction is None:
         prediction = Prediction(pool_id=pool.id, user_id=user.id, match_id=match.id)
         db.session.add(prediction)
@@ -916,6 +940,34 @@ def upsert_prediction(slug):
     prediction.predicted_away_score = predicted_away_score
     prediction.predicts_penalties = predicts_penalties
     prediction.predicted_penalty_winner_team_id = penalty_winner_team_id if predicts_penalties else None
+    prediction.has_multiplier = has_multiplier_requested
+
+    # Enforce exclusivity: only one palpitão per user per pool
+    needs_score_recalc = False
+    if has_multiplier_requested:
+        other_with_multiplier = (
+            Prediction.active()
+            .filter(
+                Prediction.pool_id == pool.id,
+                Prediction.user_id == user.id,
+                Prediction.has_multiplier == True,
+                Prediction.match_id != match.id,
+            )
+            .options(joinedload(Prediction.match))
+            .all()
+        )
+        for prev in other_with_multiplier:
+            prev.has_multiplier = False
+            if prev.match.status == MatchStatus.FINISHED.value:
+                needs_score_recalc = True
+
+    # Recalculate scores if multiplier state changed and match is finished
+    if has_multiplier_requested != old_has_multiplier and match.status == MatchStatus.FINISHED.value:
+        needs_score_recalc = True
+
+    if needs_score_recalc:
+        db.session.flush()
+        _recalculate_scores(pool)
 
     db.session.commit()
     return jsonify(_prediction_payload(prediction, user_id=user.id, include_score=False))
@@ -1032,6 +1084,15 @@ def _build_ranking(pool: Pool, *, recalculate: bool = False) -> list[dict]:
     }
     tournament = pool.tournament
 
+    # Collect users who have used their palpitão
+    palpitao_user_ids: set[str] = set(
+        row[0]
+        for row in Prediction.active()
+        .filter(Prediction.pool_id == pool.id, Prediction.has_multiplier == True)
+        .with_entities(Prediction.user_id)
+        .all()
+    )
+
     rows = (
         db.session.query(
             PoolParticipant.display_name,
@@ -1083,6 +1144,7 @@ def _build_ranking(pool: Pool, *, recalculate: bool = False) -> list[dict]:
             "outcomeHits": int(row.outcome_hits),
             "knockoutPoints": int(row.knockout_points),
             "awardPoints": award_pts,
+            "hasUsedPalpitao": row.user_id in palpitao_user_ids,
         })
     entries.sort(key=lambda e: (-e["points"], -e["exactScores"], -e["outcomeHits"], -e["knockoutPoints"]))
     for i, entry in enumerate(entries):

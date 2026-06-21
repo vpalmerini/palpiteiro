@@ -95,6 +95,7 @@ export function createPool(payload: {
     topScorer: AwardConfigPayload;
     bestPlayer: AwardConfigPayload;
   };
+  palpitao?: { enabled: boolean; multiplier: number };
 }) {
   return request<CreatedPool>("/pools", {
     method: "POST",
@@ -151,6 +152,7 @@ export type UpdatePoolPayload = {
     topScorer?: AwardConfigPayload;
     bestPlayer?: AwardConfigPayload;
   };
+  palpitao?: { enabled?: boolean; multiplier?: number };
 };
 
 export function updatePool(slug: string, payload: UpdatePoolPayload) {
@@ -192,6 +194,7 @@ export function savePrediction(
     homeScore: number;
     awayScore: number;
     penaltyWinnerTeamId?: EntityId | null;
+    hasMultiplier?: boolean;
   },
 ) {
   return request<Prediction>(`/pools/${slug}/predictions`, {

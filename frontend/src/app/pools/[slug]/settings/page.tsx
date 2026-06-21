@@ -19,7 +19,7 @@ import {
   Text,
   Textarea,
 } from "@chakra-ui/react";
-import { ArrowLeft, Lock, UserMinus } from "lucide-react";
+import { ArrowLeft, Lock, UserMinus, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -48,6 +48,11 @@ type AwardsState = {
   thirdPlace: AwardConfigPayload;
   topScorer: AwardConfigPayload;
   bestPlayer: AwardConfigPayload;
+};
+
+type PalpitaoState = {
+  enabled: boolean;
+  multiplier: number;
 };
 
 const SCORING_KEY_ORDER: (keyof ScoringState)[] = ["exactScore", "outcome", "oneTeamGoals", "penaltyBonus"];
@@ -214,6 +219,10 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
   const [prize3, setPrize3] = useState(pool.prizes.find((p) => p.position === 3)?.description ?? "");
   const [scoring, setScoring] = useState<ScoringState>({ ...pool.scoring });
   const [awards, setAwards] = useState<AwardsState>({ ...pool.awards });
+  const [palpitao, setPalpitao] = useState<PalpitaoState>({
+    enabled: pool.palpitao?.enabled ?? true,
+    multiplier: pool.palpitao?.multiplier ?? 3,
+  });
   const [isPoolLocked, setIsPoolLocked] = useState(pool.locked);
 
   const locked = pool.hasPredictions;
@@ -228,7 +237,7 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
           { position: 2, description: prize2 },
           { position: 3, description: prize3 },
         ],
-        ...(!locked && { scoring, awards }),
+        ...(!locked && { scoring, awards, palpitao }),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: poolKeys.detail(slug) });
@@ -384,6 +393,64 @@ function PoolSettingsForm({ pool, slug, ranking, removedParticipants }: { pool: 
                 </HStack>
               </HStack>
             ))}
+          </Stack>
+
+          <Separator />
+
+          {/* Palpitão */}
+          <Stack gap={3}>
+            <HStack gap={2} align="center">
+              <Zap size={16} color="var(--chakra-colors-yellow-600)" />
+              <Heading size="sm">Palpitão</Heading>
+              {locked && (
+                <Badge colorPalette="orange" variant="subtle">
+                  <HStack gap={1}><Lock size={10} /><span>Bloqueado</span></HStack>
+                </Badge>
+              )}
+            </HStack>
+            {locked && (
+              <Text fontSize="sm" color="orange.600">
+                As configurações do Palpitão não podem ser alteradas pois já existem palpites neste bolão.
+              </Text>
+            )}
+            <HStack gap={4} justify="space-between" align="flex-start" opacity={locked ? 0.5 : 1}>
+              <Stack gap={1} flex="1">
+                <Text fontSize="sm" fontWeight="medium">Habilitar Palpitão</Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Cada participante pode escolher 1 jogo para multiplicar seus pontos pelo multiplicador definido.
+                </Text>
+              </Stack>
+              <Switch.Root
+                checked={palpitao.enabled}
+                onCheckedChange={(d) => setPalpitao((prev) => ({ ...prev, enabled: d.checked }))}
+                disabled={locked}
+                colorPalette="yellow"
+              >
+                <Switch.HiddenInput />
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch.Root>
+            </HStack>
+            <HStack gap={4} align="center" opacity={locked || !palpitao.enabled ? 0.5 : 1}>
+              <Stack flex="1" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">Multiplicador</Text>
+                <Text fontSize="xs" color="fg.muted">Valor entre ×2 e ×10</Text>
+              </Stack>
+              <HStack gap={2} align="center">
+                <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">×</Text>
+                <Input
+                  type="number"
+                  min={2}
+                  max={10}
+                  w="20"
+                  size="sm"
+                  value={palpitao.multiplier}
+                  disabled={locked || !palpitao.enabled}
+                  onChange={(e) => setPalpitao((prev) => ({ ...prev, multiplier: Math.max(2, Math.min(10, Number(e.target.value))) }))}
+                />
+              </HStack>
+            </HStack>
           </Stack>
 
           <Separator />

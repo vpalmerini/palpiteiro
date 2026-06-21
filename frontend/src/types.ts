@@ -48,6 +48,10 @@ export type Pool = {
     topScorer: AwardConfig;
     bestPlayer: AwardConfig;
   };
+  palpitao: {
+    enabled: boolean;
+    multiplier: number;
+  };
 };
 
 export type AwardPrediction = {
@@ -114,6 +118,7 @@ export type Prediction = {
   awayScore: number;
   predictsPenalties: boolean;
   penaltyWinnerTeamId: EntityId | null;
+  hasMultiplier: boolean;
   updatedAt: string;
   score: PredictionScore | null;
 };
@@ -128,6 +133,7 @@ export type RankingEntry = {
   outcomeHits: number;
   knockoutPoints: number;
   awardPoints: number;
+  hasUsedPalpitao: boolean;
 };
 
 export type TournamentStatus = "ongoing" | "finished";

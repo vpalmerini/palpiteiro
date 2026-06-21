@@ -13,11 +13,12 @@ import {
   NativeSelect,
   SimpleGrid,
   Stack,
+  Switch,
   Tabs,
   Text,
   Separator,
 } from "@chakra-ui/react";
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, Clock, Lock, Star, Trophy, Users, Zap } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -251,6 +252,8 @@ export default function PredictionsPage({ params }: PageProps) {
     const homeScore = Number(form.get("homeScore"));
     const awayScore = Number(form.get("awayScore"));
     const previous = predictions[match.id];
+    // Preserve existing hasMultiplier state when saving scores
+    const hasMultiplier = previous?.hasMultiplier ?? false;
 
     const optimistic: Prediction = {
       id: previous?.id ?? match.id,
@@ -260,6 +263,7 @@ export default function PredictionsPage({ params }: PageProps) {
       awayScore,
       predictsPenalties: match.stage.isKnockout && homeScore === awayScore,
       penaltyWinnerTeamId,
+      hasMultiplier,
       updatedAt: new Date().toISOString(),
       score: previous?.score ?? null,
     };
@@ -281,6 +285,7 @@ export default function PredictionsPage({ params }: PageProps) {
         homeScore,
         awayScore,
         penaltyWinnerTeamId,
+        hasMultiplier,
       });
       setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
       patchPredictionInSetupCache(queryClient, slug, saved);
@@ -293,6 +298,68 @@ export default function PredictionsPage({ params }: PageProps) {
         return next;
       });
       setMessage(err instanceof Error ? err.message : "Erro ao salvar palpite.");
+    }
+  }
+
+  async function togglePalpitao(match: Match) {
+    if (!user || !pool) return;
+
+    const prediction = predictions[match.id];
+    const draft = scoreDrafts[match.id];
+
+    const homeScoreStr = draft?.homeScore ?? (prediction ? String(prediction.homeScore) : "");
+    const awayScoreStr = draft?.awayScore ?? (prediction ? String(prediction.awayScore) : "");
+
+    if (homeScoreStr === "" || awayScoreStr === "") {
+      setMessage("Salve um palpite antes de usar o Palpitão.");
+      return;
+    }
+
+    const homeScore = Number(homeScoreStr);
+    const awayScore = Number(awayScoreStr);
+    const penaltyWinnerTeamId = draft?.penaltyWinnerId || prediction?.penaltyWinnerTeamId || null;
+    const currentHasMultiplier = prediction?.hasMultiplier ?? false;
+    const newHasMultiplier = !currentHasMultiplier;
+
+    // Optimistic update for this prediction
+    setPredictions((current) => {
+      const updated = { ...current };
+      if (updated[match.id]) {
+        updated[match.id] = { ...updated[match.id]!, hasMultiplier: newHasMultiplier };
+      }
+      // Clear hasMultiplier from all others if enabling
+      if (newHasMultiplier) {
+        for (const id of Object.keys(updated)) {
+          if (id !== match.id && updated[id]?.hasMultiplier) {
+            updated[id] = { ...updated[id]!, hasMultiplier: false };
+          }
+        }
+      }
+      return updated;
+    });
+
+    setMessage(newHasMultiplier ? "Ativando Palpitão…" : "Removendo Palpitão…");
+
+    try {
+      const saved = await savePrediction(slug, {
+        matchId: match.id,
+        homeScore,
+        awayScore,
+        penaltyWinnerTeamId: penaltyWinnerTeamId as string | null,
+        hasMultiplier: newHasMultiplier,
+      });
+      setPredictions((current) => ({ ...current, [saved.matchId]: saved }));
+      patchPredictionInSetupCache(queryClient, slug, saved);
+      setMessage(newHasMultiplier ? "Palpitão ativado!" : "Palpitão removido.");
+    } catch (err) {
+      // Revert optimistic
+      setPredictions((current) => ({
+        ...current,
+        [match.id]: prediction
+          ? prediction
+          : { ...current[match.id]!, hasMultiplier: !newHasMultiplier },
+      }));
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar Palpitão.");
     }
   }
 
@@ -321,6 +388,45 @@ export default function PredictionsPage({ params }: PageProps) {
           {message ? <Text color="green.600" fontSize="sm">{message}</Text> : null}
         </Card.Body>
       </Card.Root>
+
+      {pool?.palpitao?.enabled ? (() => {
+        const palpitaoMatchId = Object.entries(predictions).find(([, p]) => p.hasMultiplier)?.[0] ?? null;
+        const palpitaoMatch = palpitaoMatchId ? matches.find((m) => m.id === palpitaoMatchId) : null;
+        const multiplier = pool.palpitao.multiplier;
+        return (
+          <Card.Root
+            as="section"
+            rounded="2xl"
+            borderWidth="2px"
+            borderColor={palpitaoMatchId ? "yellow.600" : "gray.200"}
+            bg={palpitaoMatchId ? "yellow.50" : undefined}
+            _dark={{ bg: palpitaoMatchId ? "yellow.950" : undefined }}
+          >
+            <Card.Body gap={2} p={{ base: 3, md: 4 }}>
+              <HStack gap={2} flexWrap="wrap">
+                <HStack gap={1.5}>
+                  <Zap size={16} color="var(--chakra-colors-yellow-600)" />
+                  <Text fontWeight="bold" fontSize="sm" color="yellow.700" _dark={{ color: "yellow.400" }}>
+                    Palpitão ×{multiplier}
+                  </Text>
+                </HStack>
+                {palpitaoMatchId ? (
+                  <Badge colorPalette="yellow" rounded="full" variant="subtle">Usado</Badge>
+                ) : (
+                  <Badge colorPalette="gray" rounded="full" variant="subtle">Disponível</Badge>
+                )}
+              </HStack>
+              <Text fontSize="xs" color="fg.muted">
+                {palpitaoMatchId
+                  ? palpitaoMatch
+                    ? `Aplicado em: ${palpitaoMatch.homeTeam?.name ?? "?"} x ${palpitaoMatch.awayTeam?.name ?? "?"}. Seus pontos nesse jogo valem ×${multiplier}.`
+                    : `Palpitão ativo em um jogo. Seus pontos nesse jogo valem ×${multiplier}.`
+                  : `Você tem 1 único Palpitão por torneio. Escolha um jogo para multiplicar seus pontos por ×${multiplier} — ative o toggle no card do jogo.`}
+              </Text>
+            </Card.Body>
+          </Card.Root>
+        );
+      })() : null}
 
       {pool && (pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) ? (
         <Card.Root
@@ -675,6 +781,8 @@ export default function PredictionsPage({ params }: PageProps) {
         const predicted = filteredMatches.filter((m) => !!predictions[m.id]);
         const missed = filteredMatches.filter((m) => !predictions[m.id] && m.isLocked);
 
+        const palpitaoMatchId = Object.entries(predictions).find(([, p]) => p.hasMultiplier)?.[0] ?? null;
+
         function renderMatchCard(match: Match) {
           const prediction = predictions[match.id];
           const draft = scoreDrafts[match.id];
@@ -686,6 +794,11 @@ export default function PredictionsPage({ params }: PageProps) {
           const isUnsavedDraft = !prediction && draft !== undefined && isLocalDraftDirty(draft, undefined);
           const isPendingSave = isDirty || isUnsavedDraft;
           const isEmptyPick = !prediction && !isPendingSave;
+
+          const isPalpitaoEnabled = pool?.palpitao?.enabled ?? false;
+          const isThisPalpitao = prediction?.hasMultiplier === true;
+          const isPalpitaoUsedElsewhere = palpitaoMatchId !== null && palpitaoMatchId !== match.id;
+          const canTogglePalpitao = isPalpitaoEnabled && !match.isLocked && (prediction !== undefined || homeScore !== "" && awayScore !== "");
 
           return (
             <Card.Root
@@ -765,8 +878,9 @@ export default function PredictionsPage({ params }: PageProps) {
                     )}
                     {prediction?.score != null && (
                       <Badge
-                        colorPalette={prediction.score.points > 0 ? "yellow" : "gray"}
-                        variant="subtle"
+                        colorPalette={isThisPalpitao ? "yellow" : prediction.score.points > 0 ? "yellow" : "gray"}
+                        variant={isThisPalpitao ? "solid" : "subtle"}
+                        css={isThisPalpitao ? { bg: "var(--chakra-colors-yellow-600)", color: "white" } : undefined}
                         rounded="full"
                         title={
                           prediction.score.exactScore
@@ -777,7 +891,10 @@ export default function PredictionsPage({ params }: PageProps) {
                         }
                       >
                         <HStack gap={1}>
-                          <Star size={10} />
+                          {isThisPalpitao ? <Zap size={10} /> : <Star size={10} />}
+                          {isThisPalpitao && pool?.palpitao && (
+                            <Text as="span" fontSize="xs" fontWeight="bold">×{pool.palpitao.multiplier} ·</Text>
+                          )}
                           {prediction.score.points} pts
                           {prediction.score.exactScore && (
                             <Text as="span" fontSize="xs" fontWeight="bold"> · exato</Text>
@@ -925,6 +1042,44 @@ export default function PredictionsPage({ params }: PageProps) {
                         </Text>
                       )
                     ) : null}
+
+                    {isPalpitaoEnabled && (
+                      <HStack
+                        gap={2}
+                        justify="space-between"
+                        align="center"
+                        opacity={isPalpitaoUsedElsewhere ? 0.5 : 1}
+                        title={isPalpitaoUsedElsewhere ? "Palpitão já usado em outro jogo" : undefined}
+                      >
+                        <Stack gap={0} flex={1}>
+                          <HStack gap={1}>
+                            <Zap size={12} color="var(--chakra-colors-yellow-600)" />
+                            <Text fontSize="xs" fontWeight="semibold" color="yellow.700" _dark={{ color: "yellow.400" }}>
+                              Palpitão ×{pool?.palpitao?.multiplier}
+                            </Text>
+                          </HStack>
+                          <Text fontSize="xs" color="fg.muted">
+                            {isThisPalpitao
+                              ? `Seus pontos neste jogo valem ×${pool?.palpitao?.multiplier}`
+                              : isPalpitaoUsedElsewhere
+                              ? "Palpitão já usado em outro jogo"
+                              : "Use 1 única vez no torneio inteiro"}
+                          </Text>
+                        </Stack>
+                        <Switch.Root
+                          checked={isThisPalpitao}
+                          onCheckedChange={() => void togglePalpitao(match)}
+                          disabled={!canTogglePalpitao || isPalpitaoUsedElsewhere}
+                          colorPalette="yellow"
+                          size="sm"
+                        >
+                          <Switch.HiddenInput />
+                          <Switch.Control>
+                            <Switch.Thumb />
+                          </Switch.Control>
+                        </Switch.Root>
+                      </HStack>
+                    )}
 
                     <Button
                       colorPalette={isPendingSave ? "orange" : "green"}
