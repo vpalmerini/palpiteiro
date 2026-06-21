@@ -63,3 +63,45 @@ def test_penalty_bonus_requires_penalty_winner():
 
     assert score.points == 7
     assert score.penalty_hit is True
+
+
+def test_palpitao_multiplies_score():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1, has_multiplier=True),
+        MatchStub(2, 1),
+        PoolStub(is_multiplier_enabled=True, multiplier_value=3),
+    )
+
+    assert score.points == 15  # 5 pts exact score × 3
+    assert score.exact_score is True
+
+
+def test_palpitao_not_applied_when_pool_disabled():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1, has_multiplier=True),
+        MatchStub(2, 1),
+        PoolStub(is_multiplier_enabled=False, multiplier_value=3),
+    )
+
+    assert score.points == 5  # no multiplication
+
+
+def test_palpitao_not_applied_on_zero_points():
+    score = calculate_prediction_score(
+        PredictionStub(0, 0, has_multiplier=True),
+        MatchStub(3, 1),
+        PoolStub(is_multiplier_enabled=True, multiplier_value=5),
+    )
+
+    assert score.points == 0
+
+
+def test_palpitao_multiplier_value_is_respected():
+    score = calculate_prediction_score(
+        PredictionStub(1, 0, has_multiplier=True),
+        MatchStub(2, 0),
+        PoolStub(is_multiplier_enabled=True, multiplier_value=4),
+    )
+
+    # outcome (3) + one team goals (1) = 4, × 4 = 16
+    assert score.points == 16
