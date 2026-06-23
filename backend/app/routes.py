@@ -1084,11 +1084,16 @@ def _build_ranking(pool: Pool, *, recalculate: bool = False) -> list[dict]:
     }
     tournament = pool.tournament
 
-    # Collect users who have used their palpitão
+    # Collect users whose palpitão has been applied to a finished match
     palpitao_user_ids: set[str] = set(
         row[0]
         for row in Prediction.active()
-        .filter(Prediction.pool_id == pool.id, Prediction.has_multiplier == True)
+        .join(Match, Match.id == Prediction.match_id)
+        .filter(
+            Prediction.pool_id == pool.id,
+            Prediction.has_multiplier == True,
+            Match.status == MatchStatus.FINISHED.value,
+        )
         .with_entities(Prediction.user_id)
         .all()
     )
