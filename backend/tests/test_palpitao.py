@@ -205,6 +205,12 @@ def test_ranking_shows_has_used_palpitao_true_after_setting():
             json={"matchId": match.id, "homeScore": 1, "awayScore": 0, "hasMultiplier": True},
         )
 
+        # Finish the match so the multiplier is counted in the ranking
+        match.home_score = 1
+        match.away_score = 0
+        match.status = MatchStatus.FINISHED.value
+        db.session.commit()
+
         ranking = client.get(f"/api/pools/{slug}/ranking").get_json()
         creator_entry = next(e for e in ranking if e["userId"] == creator.id)
 
