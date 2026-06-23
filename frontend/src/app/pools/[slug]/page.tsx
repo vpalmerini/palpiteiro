@@ -433,7 +433,7 @@ export default function PoolPage({ params }: PageProps) {
                     <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
                     <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
                     {pool.palpitao?.enabled && (
-                      <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão usado" : "Palpitão disponível"}>
+                      <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão aplicado" : "Palpitão disponível"}>
                         <Zap
                           size={14}
                           color={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "var(--chakra-colors-gray-300)"}
