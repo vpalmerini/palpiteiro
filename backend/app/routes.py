@@ -250,6 +250,7 @@ def _pool_payload(pool: Pool, *, is_participant: bool | None = None, is_removed:
             "outcome": pool.outcome_points,
             "oneTeamGoals": pool.one_team_goals_points,
             "penaltyBonus": pool.penalty_bonus_points,
+            "knockoutMultiplier": pool.knockout_score_multiplier,
         },
         "prizes": [
             {"position": prize.position, "description": prize.description}
@@ -329,7 +330,11 @@ def _recalculate_scores(pool: Pool):
             Prediction.match_id.in_(finished_match_ids),
             Prediction.deleted_at.is_(None),
         )
-        .options(joinedload(Prediction.match))
+        .options(
+            joinedload(Prediction.match)
+            .joinedload(Match.round)
+            .joinedload(Round.stage)
+        )
         .all()
     )
     if not predictions:
@@ -523,6 +528,7 @@ def create_pool():
         outcome_points=int(scoring.get("outcome", 3)),
         one_team_goals_points=int(scoring.get("oneTeamGoals", 1)),
         penalty_bonus_points=int(scoring.get("penaltyBonus", 2)),
+        knockout_score_multiplier=max(1, min(10, int(scoring.get("knockoutMultiplier", 1)))),
         predict_champion=champion_enabled,
         champion_points=champion_pts,
         predict_runner_up=runner_up_enabled,
@@ -581,6 +587,9 @@ def update_pool(slug):
 
     if "locked" in data:
         pool.locked = bool(data["locked"])
+
+    if "knockoutScoreMultiplier" in data:
+        pool.knockout_score_multiplier = max(1, min(10, int(data["knockoutScoreMultiplier"])))
 
     if "description" in data:
         pool.description = (data.get("description") or "").strip() or None

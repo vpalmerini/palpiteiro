@@ -283,6 +283,7 @@ class Pool(TimestampSoftDeleteMixin, db.Model):
     locked = db.Column(db.Boolean, nullable=False, default=False)
     is_multiplier_enabled = db.Column(db.Boolean, nullable=False, default=True)
     multiplier_value = db.Column(db.Integer, nullable=False, default=3)
+    knockout_score_multiplier = db.Column(db.Integer, nullable=False, default=1)
 
     tournament = db.relationship("Tournament", backref="pools")
     creator = db.relationship("User", foreign_keys=[creator_user_id], backref="created_pools")
