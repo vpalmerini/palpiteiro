@@ -13,6 +13,7 @@ class PoolStub:
     penalty_bonus_points: int = 2
     is_multiplier_enabled: bool = False
     multiplier_value: int = 3
+    knockout_score_multiplier: int = 1
 
 
 @dataclass
@@ -21,6 +22,7 @@ class MatchStub:
     away_score: int
     went_to_penalties: bool = False
     penalty_winner_team_id: str | None = None
+    is_knockout: bool = False
 
 
 @dataclass
@@ -105,3 +107,43 @@ def test_palpitao_multiplier_value_is_respected():
 
     # outcome (3) + one team goals (1) = 4, × 4 = 16
     assert score.points == 16
+
+
+def test_knockout_multiplier_doubles_points():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1),
+        MatchStub(2, 1, is_knockout=True),
+        PoolStub(knockout_score_multiplier=2),
+    )
+
+    assert score.points == 10  # 5 pts exact score × 2
+
+
+def test_knockout_multiplier_not_applied_in_group_stage():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1),
+        MatchStub(2, 1, is_knockout=False),
+        PoolStub(knockout_score_multiplier=2),
+    )
+
+    assert score.points == 5
+
+
+def test_knockout_multiplier_stacks_with_palpitao():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1, has_multiplier=True),
+        MatchStub(2, 1, is_knockout=True),
+        PoolStub(knockout_score_multiplier=2, is_multiplier_enabled=True, multiplier_value=3),
+    )
+
+    assert score.points == 30  # 5 × 2 × 3
+
+
+def test_knockout_multiplier_default_is_one():
+    score = calculate_prediction_score(
+        PredictionStub(2, 1),
+        MatchStub(2, 1, is_knockout=True),
+        PoolStub(),
+    )
+
+    assert score.points == 5

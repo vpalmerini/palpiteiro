@@ -50,6 +50,12 @@ def _ensure_knockout_match_has_teams(tournament_id: str) -> None:
 
     match.home_team_id = teams[0].id
     match.away_team_id = teams[1].id
+    # Seed knockout dates can fall in the past as the calendar advances; keep open for tests.
+    starts_at = match.starts_at
+    if starts_at.tzinfo is None:
+        starts_at = starts_at.replace(tzinfo=timezone.utc)
+    if starts_at <= datetime.now(timezone.utc):
+        match.starts_at = datetime.now(timezone.utc) + timedelta(hours=2)
     db.session.flush()
 
 

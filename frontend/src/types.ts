@@ -39,6 +39,7 @@ export type Pool = {
     outcome: number;
     oneTeamGoals: number;
     penaltyBonus: number;
+    knockoutMultiplier: number;
   };
   prizes: Prize[];
   awards: {

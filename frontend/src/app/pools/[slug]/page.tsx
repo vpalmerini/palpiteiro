@@ -302,6 +302,12 @@ export default function PoolPage({ params }: PageProps) {
                 <Text fontSize="xl" fontWeight="bold">{pool.scoring.penaltyBonus} pts</Text>
                 <Text fontSize="sm" color="fg.muted">Acerto de pênalti</Text>
               </Stack>
+              {(pool.scoring.knockoutMultiplier ?? 1) > 1 && (
+                <Stack gap={0}>
+                  <Text fontSize="xl" fontWeight="bold">×{pool.scoring.knockoutMultiplier}</Text>
+                  <Text fontSize="sm" color="fg.muted">Mata-mata</Text>
+                </Stack>
+              )}
             </SimpleGrid>
           </Stack>
 
