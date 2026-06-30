@@ -1023,18 +1023,23 @@ export default function PredictionsPage({ params }: PageProps) {
                       isPredictedKnockoutDraw ? (
                         <Field.Root required>
                           <Field.Label>Vencedor nos pênaltis</Field.Label>
-                          <NativeSelect.Root disabled={match.isLocked}>
-                            <NativeSelect.Field
-                              name="penaltyWinnerTeamId"
-                              value={draft?.penaltyWinnerId ?? (prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "")}
-                              onChange={(event) => updateDraft(match.id, "penaltyWinnerId", event.target.value)}
-                            >
-                              <option value="">Selecione o vencedor</option>
-                              {match.homeTeam ? <option value={match.homeTeam.id}>{match.homeTeam.name}</option> : null}
-                              {match.awayTeam ? <option value={match.awayTeam.id}>{match.awayTeam.name}</option> : null}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
+                          <fieldset disabled={match.isLocked} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
+                            <NativeSelect.Root disabled={match.isLocked}>
+                              <NativeSelect.Field
+                                name="penaltyWinnerTeamId"
+                                value={draft?.penaltyWinnerId ?? (prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "")}
+                                onChange={(event) => {
+                                  if (match.isLocked) return;
+                                  updateDraft(match.id, "penaltyWinnerId", event.target.value);
+                                }}
+                              >
+                                <option value="">Selecione o vencedor</option>
+                                {match.homeTeam ? <option value={match.homeTeam.id}>{match.homeTeam.name}</option> : null}
+                                {match.awayTeam ? <option value={match.awayTeam.id}>{match.awayTeam.name}</option> : null}
+                              </NativeSelect.Field>
+                              <NativeSelect.Indicator />
+                            </NativeSelect.Root>
+                          </fieldset>
                         </Field.Root>
                       ) : (
                         <Text color="fg.muted" fontSize="sm">

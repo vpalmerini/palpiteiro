@@ -55,6 +55,17 @@ def _parse_utc_date(utc_date_str: str) -> datetime:
     return datetime.fromisoformat(utc_date_str.replace("Z", "+00:00"))
 
 
+def _team_score_values(node: dict | None) -> tuple[int, int] | None:
+    """Read home/away goals from a football-data.org score node (v4 uses homeTeam/awayTeam)."""
+    if not node:
+        return None
+    home = node.get("homeTeam", node.get("home"))
+    away = node.get("awayTeam", node.get("away"))
+    if home is not None and away is not None:
+        return home, away
+    return None
+
+
 def _regular_time_score(ext_match: dict) -> tuple[int, int] | None:
     """Extract the pre-penalty score from an external match payload.
 
@@ -66,27 +77,31 @@ def _regular_time_score(ext_match: dict) -> tuple[int, int] | None:
     duration = score.get("duration", "REGULAR")
 
     if duration == "PENALTY_SHOOTOUT":
-        regular = score.get("regularTime") or score.get("halfTime")
-        if regular and regular.get("home") is not None:
-            return regular["home"], regular["away"]
-        extra = score.get("extraTime")
-        if extra and extra.get("home") is not None:
-            return extra["home"], extra["away"]
+        for node in (score.get("regularTime"), score.get("halfTime"), score.get("extraTime")):
+            values = _team_score_values(node)
+            if values is not None:
+                return values
 
-    full = score.get("fullTime", {})
-    if full.get("home") is not None and full.get("away") is not None:
-        return full["home"], full["away"]
+    values = _team_score_values(score.get("fullTime"))
+    if values is not None:
+        return values
 
     return None
 
 
-def _penalty_winner_team_id(match: Match, ext_match: dict) -> str | None:
+def _penalty_winner_team_id(match: Match, ext_match: dict, home_score: int, away_score: int) -> str | None:
     """Return the internal team id of the penalty-shootout winner, or None."""
     score = ext_match.get("score", {})
-    if score.get("duration") != "PENALTY_SHOOTOUT":
+    duration = score.get("duration", "REGULAR")
+    winner = score.get("winner")
+
+    is_knockout = match.round.stage.is_knockout
+    went_to_penalties = duration == "PENALTY_SHOOTOUT" or (
+        is_knockout and home_score == away_score and winner in ("HOME_TEAM", "AWAY_TEAM")
+    )
+    if not went_to_penalties:
         return None
 
-    winner = score.get("winner")
     if winner == "HOME_TEAM":
         return match.home_team_id
     if winner == "AWAY_TEAM":
@@ -184,7 +199,7 @@ def sync_tournament_results(tournament: Tournament) -> SyncSummary:
             continue
 
         home_score, away_score = scores
-        pen_winner_id = _penalty_winner_team_id(match, ext_match)
+        pen_winner_id = _penalty_winner_team_id(match, ext_match, home_score, away_score)
 
         apply_match_result(match, home_score, away_score, pen_winner_id)
         summary.updated.append(str(match.id))
