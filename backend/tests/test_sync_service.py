@@ -401,6 +401,42 @@ class TestSyncTournamentResults:
         assert match.went_to_penalties is True
         assert match.penalty_winner_team_id == away.id
 
+    def test_applies_penalty_shootout_score_v4_api_format(self, app):
+        from app.sync_service import sync_tournament_results
+
+        tournament = _make_tournament(code="WC")
+        stage = _make_stage(tournament, stage_type=StageType.KNOCKOUT.value)
+        round_ = _make_round(stage)
+        home = _make_team("BRA", external_id=764)
+        away = _make_team("ARG", external_id=762)
+        _make_pool(tournament)
+        match = _make_match(tournament, round_, home, away, external_id=9003)
+        db.session.commit()
+
+        ext_matches = [
+            {
+                "id": 9003,
+                "status": "FINISHED",
+                "homeTeam": {"id": 764},
+                "awayTeam": {"id": 762},
+                "score": {
+                    "duration": "PENALTY_SHOOTOUT",
+                    "winner": "HOME_TEAM",
+                    "regularTime": {"homeTeam": 0, "awayTeam": 0},
+                    "fullTime": {"homeTeam": 0, "awayTeam": 0},
+                },
+            }
+        ]
+        with patch("app.sync_service.list_matches_for_dates", return_value=ext_matches):
+            summary = sync_tournament_results(tournament)
+
+        assert len(summary.updated) == 1
+        db.session.refresh(match)
+        assert match.home_score == 0
+        assert match.away_score == 0
+        assert match.went_to_penalties is True
+        assert match.penalty_winner_team_id == home.id
+
     def test_idempotent_sync(self, app):
         from app.sync_service import sync_tournament_results
 

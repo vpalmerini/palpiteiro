@@ -1026,6 +1026,7 @@ export default function PredictionsPage({ params }: PageProps) {
                           <NativeSelect.Root disabled={match.isLocked}>
                             <NativeSelect.Field
                               name="penaltyWinnerTeamId"
+                              disabled={match.isLocked}
                               value={draft?.penaltyWinnerId ?? (prediction?.penaltyWinnerTeamId ? String(prediction.penaltyWinnerTeamId) : "")}
                               onChange={(event) => updateDraft(match.id, "penaltyWinnerId", event.target.value)}
                             >
