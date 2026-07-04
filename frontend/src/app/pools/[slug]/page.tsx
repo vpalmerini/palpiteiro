@@ -467,7 +467,11 @@ export default function PoolPage({ params }: PageProps) {
                 ))}
               </HStack>
             )}
-            <Box w="full" h={{ base: `${Math.max(280, participants.length * 44)}px`, md: `${Math.max(360, participants.length * 52)}px` }}>
+            <Box w="full" overflowX="auto">
+            <Box
+                minW={`${Math.max(400, snapshots.length * 140)}px`}
+                h={{ base: `${Math.max(280, participants.length * 44)}px`, md: `${Math.max(360, participants.length * 52)}px` }}
+              >
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chakra-colors-gray-200)" />
@@ -563,6 +567,7 @@ export default function PoolPage({ params }: PageProps) {
                   })}
                 </LineChart>
               </ResponsiveContainer>
+            </Box>
             </Box>
             <Text fontSize="xs" color="fg.muted">
               Posição no ranking ao final de cada rodada finalizada pelo admin.
