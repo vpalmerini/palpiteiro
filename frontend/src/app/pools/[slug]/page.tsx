@@ -23,7 +23,6 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -85,9 +84,17 @@ export default function PoolPage({ params }: PageProps) {
     const lastSnapshot = snapshots[snapshots.length - 1];
     const participantsSorted = [...lastSnapshot.entries].sort((a, b) => a.position - b.position);
 
+    const snapshotsPerStage = new Map<string, number>();
+    for (const s of snapshots) {
+      snapshotsPerStage.set(s.stageId, (snapshotsPerStage.get(s.stageId) ?? 0) + 1);
+    }
+
     const chartPoints = snapshots.map((snap) => {
+      const stageHasOneRound = (snapshotsPerStage.get(snap.stageId) ?? 0) === 1;
       const label = multipleStages
-        ? `${snap.stageName.substring(0, 6)}… ${ordinalRound(snap.roundNumber)}`
+        ? stageHasOneRound
+          ? snap.stageName
+          : `${snap.stageName.substring(0, 6)}… ${ordinalRound(snap.roundNumber)}`
         : ordinalRound(snap.roundNumber);
       const point: Record<string, string | number> = { label };
       for (const entry of snap.entries) {
@@ -482,29 +489,6 @@ export default function PoolPage({ params }: PageProps) {
                     tick={{ fontSize: 11 }}
                     domain={[1, participants.length || 1]}
                     label={{ value: "Pos.", angle: -90, position: "insideLeft", offset: 20, style: { fontSize: 11 } }}
-                  />
-                  <Tooltip
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    content={({ active, payload, label }: any) => {
-                      if (!active || !payload?.length) return null;
-                      return (
-                        <Box bg="white" border="1px solid" borderColor="gray.200" rounded="md" p={3} shadow="md" fontSize="sm">
-                          <Text fontWeight="semibold" mb={1}>{label}</Text>
-                          {payload
-                            .filter((entry: any) => !String(entry.dataKey).endsWith("_pts"))
-                            .sort((a: any, b: any) => a.value - b.value)
-                            .map((entry: any) => {
-                              const pts = payload.find((e: any) => e.dataKey === `${entry.dataKey}_pts`)?.value;
-                              return (
-                                <HStack key={entry.dataKey} gap={2}>
-                                  <Box w={3} h={3} rounded="full" bg={entry.color} flexShrink={0} />
-                                  <Text color="gray.700">{entry.name}: <Text as="span" fontWeight="bold">{entry.value}º</Text>{pts != null ? ` (${pts} pts)` : ""}</Text>
-                                </HStack>
-                              );
-                            })}
-                        </Box>
-                      );
-                    }}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: 12 }}
