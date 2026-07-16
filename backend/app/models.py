@@ -70,7 +70,7 @@ class Tournament(TimestampSoftDeleteMixin, db.Model):
     champion_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     runner_up_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
     third_place_team_id = db.Column(UUID, db.ForeignKey("teams.id"), nullable=True, index=True)
-    top_scorer = db.Column(db.String(120), nullable=True)
+    top_scorers = db.Column(db.JSON, nullable=True)
     best_player = db.Column(db.String(120), nullable=True)
 
     champion = db.relationship("Team", foreign_keys=[champion_team_id])

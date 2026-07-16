@@ -41,6 +41,7 @@ from .models import (
     TournamentTeam,
     User,
 )
+from .award_matching import names_match as _names_match
 from .scoring import calculate_prediction_score
 
 MAX_POOLS_PER_USER_PER_TOURNAMENT = 5
@@ -1071,7 +1072,7 @@ def _pool_ranking_updated_at(pool: Pool) -> datetime | None:
         (pool.predict_champion and tournament.champion_team_id)
         or (pool.predict_runner_up and tournament.runner_up_team_id)
         or (pool.predict_third_place and tournament.third_place_team_id)
-        or (pool.predict_top_scorer and tournament.top_scorer)
+        or (pool.predict_top_scorer and tournament.top_scorers)
         or (pool.predict_best_player and tournament.best_player)
     )
     if has_award_results:
@@ -1295,7 +1296,7 @@ def _tournament_payload(tournament: Tournament):
             "runnerUpTeam": _team_payload(tournament.runner_up) if tournament.runner_up_team_id else None,
             "thirdPlaceTeamId": tournament.third_place_team_id,
             "thirdPlaceTeam": _team_payload(tournament.third_place) if tournament.third_place_team_id else None,
-            "topScorer": tournament.top_scorer,
+            "topScorers": tournament.top_scorers or [],
             "bestPlayer": tournament.best_player,
         },
     }
@@ -1316,6 +1317,7 @@ def _award_prediction_payload(award_pred: AwardPrediction):
 def _assert_tournament_editable(tournament: Tournament):
     if tournament.status == TournamentStatus.FINISHED.value:
         abort(403, description="O torneio está encerrado e não pode ser editado")
+
 
 
 def _calculate_award_points(
@@ -1340,11 +1342,11 @@ def _calculate_award_points(
     if pool.predict_third_place and tournament.third_place_team_id:
         if award_pred.third_place_team_id == tournament.third_place_team_id:
             points += pool.third_place_points
-    if pool.predict_top_scorer and tournament.top_scorer and award_pred.top_scorer:
-        if award_pred.top_scorer.strip().lower() == tournament.top_scorer.strip().lower():
+    if pool.predict_top_scorer and tournament.top_scorers and award_pred.top_scorer:
+        if any(_names_match(award_pred.top_scorer, official) for official in tournament.top_scorers):
             points += pool.top_scorer_points
     if pool.predict_best_player and tournament.best_player and award_pred.best_player:
-        if award_pred.best_player.strip().lower() == tournament.best_player.strip().lower():
+        if _names_match(award_pred.best_player, tournament.best_player):
             points += pool.best_player_points
     return points
 
@@ -1915,8 +1917,12 @@ def update_tournament_awards(tournament_id):
         tournament.runner_up_team_id = _parse_optional_id(data["runnerUpTeamId"])
     if "thirdPlaceTeamId" in data:
         tournament.third_place_team_id = _parse_optional_id(data["thirdPlaceTeamId"])
-    if "topScorer" in data:
-        tournament.top_scorer = (data["topScorer"] or "").strip() or None
+    if "topScorers" in data:
+        raw = data["topScorers"]
+        if not isinstance(raw, list):
+            abort(400, description="topScorers deve ser uma lista de strings")
+        cleaned = [s.strip() for s in raw if isinstance(s, str) and s.strip()]
+        tournament.top_scorers = cleaned if cleaned else None
     if "bestPlayer" in data:
         tournament.best_player = (data["bestPlayer"] or "").strip() or None
     db.session.commit()

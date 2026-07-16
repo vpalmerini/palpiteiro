@@ -444,7 +444,7 @@ export function adminUpdateTournamentAwards(
     championTeamId: EntityId | null;
     runnerUpTeamId: EntityId | null;
     thirdPlaceTeamId: EntityId | null;
-    topScorer: string;
+    topScorers: string[];
     bestPlayer: string;
   }>,
 ) {
