@@ -1596,9 +1596,10 @@ function AwardsPanel({
     championTeamId: aw.championTeamId ? String(aw.championTeamId) : "",
     runnerUpTeamId: aw.runnerUpTeamId ? String(aw.runnerUpTeamId) : "",
     thirdPlaceTeamId: aw.thirdPlaceTeamId ? String(aw.thirdPlaceTeamId) : "",
-    topScorer: aw.topScorer ?? "",
+    topScorers: aw.topScorers ?? [] as string[],
     bestPlayer: aw.bestPlayer ?? "",
   });
+  const [topScorerInput, setTopScorerInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -1612,7 +1613,7 @@ function AwardsPanel({
         championTeamId: draft.championTeamId || null,
         runnerUpTeamId: draft.runnerUpTeamId || null,
         thirdPlaceTeamId: draft.thirdPlaceTeamId || null,
-        topScorer: draft.topScorer || "",
+        topScorers: draft.topScorers,
         bestPlayer: draft.bestPlayer || "",
       });
       onUpdated(updated);
@@ -1673,14 +1674,66 @@ function AwardsPanel({
               </NativeSelect.Root>
             </Stack>
             <Stack gap={1}>
-              <Text fontSize="sm" fontWeight="medium">Artilheiro</Text>
-              <Input
-                size="sm"
-                placeholder="Nome do jogador"
-                disabled={isFinished}
-                value={draft.topScorer}
-                onChange={(e) => { setDraft((d) => ({ ...d, topScorer: e.target.value })); setSaved(false); }}
-              />
+              <Text fontSize="sm" fontWeight="medium">Artilheiro(s)</Text>
+              {draft.topScorers.length > 0 && (
+                <HStack wrap="wrap" gap={1}>
+                  {draft.topScorers.map((name) => (
+                    <Badge key={name} colorPalette="blue" size="sm">
+                      {name}
+                      {!isFinished && (
+                        <Box
+                          as="span"
+                          ml={1}
+                          cursor="pointer"
+                          fontWeight="bold"
+                          onClick={() => {
+                            setDraft((d) => ({ ...d, topScorers: d.topScorers.filter((n) => n !== name) }));
+                            setSaved(false);
+                          }}
+                        >
+                          ×
+                        </Box>
+                      )}
+                    </Badge>
+                  ))}
+                </HStack>
+              )}
+              {!isFinished && (
+                <HStack>
+                  <Input
+                    size="sm"
+                    placeholder="Nome do jogador"
+                    value={topScorerInput}
+                    onChange={(e) => setTopScorerInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const name = topScorerInput.trim();
+                        if (name && !draft.topScorers.includes(name)) {
+                          setDraft((d) => ({ ...d, topScorers: [...d.topScorers, name] }));
+                          setSaved(false);
+                        }
+                        setTopScorerInput("");
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      const name = topScorerInput.trim();
+                      if (name && !draft.topScorers.includes(name)) {
+                        setDraft((d) => ({ ...d, topScorers: [...d.topScorers, name] }));
+                        setSaved(false);
+                      }
+                      setTopScorerInput("");
+                    }}
+                  >
+                    Adicionar
+                  </Button>
+                </HStack>
+              )}
             </Stack>
             <Stack gap={1}>
               <Text fontSize="sm" fontWeight="medium">Melhor jogador</Text>

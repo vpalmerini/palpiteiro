@@ -154,7 +154,7 @@ export type Tournament = {
     runnerUpTeam: { id: EntityId; name: string; shortName: string } | null;
     thirdPlaceTeamId: EntityId | null;
     thirdPlaceTeam: { id: EntityId; name: string; shortName: string } | null;
-    topScorer: string | null;
+    topScorers: string[];
     bestPlayer: string | null;
   };
 };

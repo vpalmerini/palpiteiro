@@ -11,3 +11,4 @@ PyJWT
 pywebpush
 tzdata
 gunicorn
+rapidfuzz
