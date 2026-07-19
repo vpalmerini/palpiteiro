@@ -479,6 +479,9 @@ export default function PoolPage({ params }: PageProps) {
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 1">Placares exatos</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 2">Resultados</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="center" title="Critério de desempate 3">Pts. mata-mata</Table.ColumnHeader>
+                  {(pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) && (
+                    <Table.ColumnHeader textAlign="center" title="Pontos de palpites especiais">Especiais</Table.ColumnHeader>
+                  )}
                   {pool.palpitao?.enabled && (
                     <Table.ColumnHeader textAlign="center" title={`Palpitão ×${pool.palpitao.multiplier}`} w="12">
                       <Zap size={14} />
@@ -527,6 +530,9 @@ export default function PoolPage({ params }: PageProps) {
                       <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
                       <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
                       <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
+                      {(pool.awards.champion.enabled || pool.awards.runnerUp.enabled || pool.awards.thirdPlace.enabled || pool.awards.topScorer.enabled || pool.awards.bestPlayer.enabled) && (
+                        <Table.Cell textAlign="center">{entry.awardPoints}</Table.Cell>
+                      )}
                       {pool.palpitao?.enabled && (
                         <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão aplicado" : "Palpitão disponível"}>
                           <Zap
