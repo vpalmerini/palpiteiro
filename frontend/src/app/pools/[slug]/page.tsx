@@ -408,6 +408,67 @@ export default function PoolPage({ params }: PageProps) {
               </Text>
             </HStack>
           </HStack>
+
+          {pool.tournamentStatus === "finished" && ranking.length > 0 && (() => {
+            const podiumOrder = [
+              ranking.find((e) => e.position === 2) ?? null,
+              ranking.find((e) => e.position === 1) ?? null,
+              ranking.find((e) => e.position === 3) ?? null,
+            ];
+            const MEDAL_COLORS = ["silver", "gold", "#cd7f32"] as const;
+            const STEP_COLORS = ["gray.300", "yellow.400", "orange.300"] as const;
+            const STEP_HEIGHTS = ["55px", "80px", "40px"] as const;
+            const AVATAR_SIZES = ["md", "lg", "md"] as const;
+
+            return (
+              <>
+                <Separator />
+                <Stack gap={4} align="center" py={2}>
+                  <HStack align="flex-end" justify="center" gap={0} w="full" maxW="480px" mx="auto">
+                    {podiumOrder.map((entry, idx) => {
+                      if (!entry) return <Box key={idx} flex={1} />;
+                      const medalColor = MEDAL_COLORS[idx];
+                      const stepColor = STEP_COLORS[idx];
+                      const stepHeight = STEP_HEIGHTS[idx];
+                      const avatarSize = AVATAR_SIZES[idx];
+                      return (
+                        <Stack key={entry.userId} flex={1} align="center" gap={0}>
+                          <Stack align="center" gap={1} pb={2}>
+                            <Avatar.Root size={avatarSize}>
+                              {entry.pictureUrl ? (
+                                <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                              ) : (
+                                <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                              )}
+                            </Avatar.Root>
+                            <Text fontSize="xs" fontWeight="semibold" textAlign="center" lineClamp={2} maxW="90px">
+                              {entry.displayName}
+                            </Text>
+                            <HStack gap={1} justify="center">
+                              <Medal size={14} color={medalColor} fill={medalColor} />
+                              <Text fontSize="xs" fontWeight="bold">{entry.points} pts</Text>
+                            </HStack>
+                          </Stack>
+                          <Box
+                            w="full"
+                            h={stepHeight}
+                            bg={stepColor}
+                            roundedTop="md"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            <Text fontWeight="bold" fontSize="lg" color="gray.700">{entry.position}º</Text>
+                          </Box>
+                        </Stack>
+                      );
+                    })}
+                  </HStack>
+                </Stack>
+              </>
+            );
+          })()}
+
           <Table.ScrollArea>
             <Table.Root>
               <Table.Header>
@@ -426,36 +487,58 @@ export default function PoolPage({ params }: PageProps) {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {ranking.map((entry) => (
-                  <Table.Row key={entry.userId}>
-                    <Table.Cell>{entry.position}</Table.Cell>
-                    <Table.Cell>
-                      <HStack gap={2}>
-                        <Avatar.Root size="sm">
-                          {entry.pictureUrl ? (
-                            <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
-                          ) : (
-                            <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
-                          )}
-                        </Avatar.Root>
-                        <Text>{entry.displayName}</Text>
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell textAlign="center" fontWeight="semibold">{entry.points}</Table.Cell>
-                    <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
-                    <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
-                    <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
-                    {pool.palpitao?.enabled && (
-                      <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão aplicado" : "Palpitão disponível"}>
-                        <Zap
-                          size={14}
-                          color={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "var(--chakra-colors-gray-300)"}
-                          fill={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "none"}
-                        />
+                {ranking.map((entry) => {
+                  const podiumBg =
+                    pool.tournamentStatus === "finished"
+                      ? entry.position === 1
+                        ? "yellow.50"
+                        : entry.position === 2
+                          ? "gray.50"
+                          : entry.position === 3
+                            ? "orange.50"
+                            : undefined
+                      : undefined;
+                  const positionLabel =
+                    pool.tournamentStatus === "finished"
+                      ? entry.position === 1
+                        ? "🥇"
+                        : entry.position === 2
+                          ? "🥈"
+                          : entry.position === 3
+                            ? "🥉"
+                            : entry.position
+                      : entry.position;
+                  return (
+                    <Table.Row key={entry.userId} bg={podiumBg}>
+                      <Table.Cell>{positionLabel}</Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Avatar.Root size="sm">
+                            {entry.pictureUrl ? (
+                              <Avatar.Image src={entry.pictureUrl} alt={entry.displayName} />
+                            ) : (
+                              <Avatar.Fallback>{entry.displayName.charAt(0).toUpperCase()}</Avatar.Fallback>
+                            )}
+                          </Avatar.Root>
+                          <Text>{entry.displayName}</Text>
+                        </HStack>
                       </Table.Cell>
-                    )}
-                  </Table.Row>
-                ))}
+                      <Table.Cell textAlign="center" fontWeight="semibold">{entry.points}</Table.Cell>
+                      <Table.Cell textAlign="center">{entry.exactScores}</Table.Cell>
+                      <Table.Cell textAlign="center">{entry.outcomeHits}</Table.Cell>
+                      <Table.Cell textAlign="center">{entry.knockoutPoints}</Table.Cell>
+                      {pool.palpitao?.enabled && (
+                        <Table.Cell textAlign="center" title={entry.hasUsedPalpitao ? "Palpitão aplicado" : "Palpitão disponível"}>
+                          <Zap
+                            size={14}
+                            color={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "var(--chakra-colors-gray-300)"}
+                            fill={entry.hasUsedPalpitao ? "var(--chakra-colors-yellow-600)" : "none"}
+                          />
+                        </Table.Cell>
+                      )}
+                    </Table.Row>
+                  );
+                })}
               </Table.Body>
             </Table.Root>
           </Table.ScrollArea>
